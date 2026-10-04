@@ -10,7 +10,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->nullable()->constrained('organizations')->restrictOnDelete();
             $t->ulid('actor_id')->nullable();
             $t->string('action', 100);
@@ -30,7 +31,8 @@ return new class extends Migration
 
         // Transactional outbox: written in the same transaction as the change, published by a worker.
         Schema::create('domain_events', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->restrictOnDelete();
             $t->string('event_type', 100);
             $t->string('aggregate_type', 60);

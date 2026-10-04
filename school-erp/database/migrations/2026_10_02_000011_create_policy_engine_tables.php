@@ -15,7 +15,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('presets', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->string('key', 100);
             $t->string('version', 20);
             $t->string('name');
@@ -30,7 +31,8 @@ return new class extends Migration
         DB::statement("ALTER TABLE presets ADD CONSTRAINT presets_status_chk CHECK (status IN ('active','deprecated'))");
 
         Schema::create('system_policies', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->ulid('preset_id');
             $t->string('type', 60);
             $t->string('key', 100);
@@ -47,7 +49,8 @@ return new class extends Migration
         });
 
         Schema::create('policy_overrides', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->string('policy_type', 60);
             $t->string('policy_key', 100);

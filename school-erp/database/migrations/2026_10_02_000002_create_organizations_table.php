@@ -10,7 +10,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('organizations', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->string('name');
             $t->string('slug')->unique();
             $t->string('status', 20)->default('active');

@@ -17,7 +17,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('permissions', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->string('code', 100)->unique();          // e.g. fees.voucher.waive
             $t->string('module', 50)->index();
             $t->string('name');
@@ -29,7 +30,8 @@ return new class extends Migration
         });
 
         Schema::create('roles', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->nullable()->constrained('organizations')->cascadeOnDelete();
             $t->ulid('campus_id')->nullable();
             $t->string('key', 60);
@@ -59,7 +61,8 @@ return new class extends Migration
         DB::statement('ALTER TABLE role_permissions ADD CONSTRAINT role_permissions_scope_chk CHECK (max_scope IN ' . self::SCOPES . ')');
 
         Schema::create('role_assignments', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('user_id');
             $t->ulid('role_id');
@@ -85,7 +88,8 @@ return new class extends Migration
         DB::statement('ALTER TABLE role_assignments ADD CONSTRAINT role_assignments_window_chk CHECK (ends_at IS NULL OR ends_at > starts_at)');
 
         Schema::create('permission_grants', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('user_id');
             $t->ulid('permission_id');
@@ -111,7 +115,8 @@ return new class extends Migration
 
         // Caps what a grantor may hand out (e.g. Campus Admin cannot grant beyond own campus).
         Schema::create('delegation_boundaries', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('grantor_role_id');
             $t->ulid('grantee_role_id');
@@ -127,7 +132,8 @@ return new class extends Migration
         DB::statement('ALTER TABLE delegation_boundaries ADD CONSTRAINT delegation_boundaries_scope_chk CHECK (max_scope IN ' . self::SCOPES . ')');
 
         Schema::create('module_enablement', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('campus_id')->nullable();
             $t->string('module', 50);

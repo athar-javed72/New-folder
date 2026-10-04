@@ -9,7 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('grades', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('program_id');
             $t->string('key', 30);                 // grade-5, o-level-1
@@ -24,7 +25,8 @@ return new class extends Migration
         });
 
         Schema::create('sections', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('campus_id');
             $t->ulid('academic_calendar_id');

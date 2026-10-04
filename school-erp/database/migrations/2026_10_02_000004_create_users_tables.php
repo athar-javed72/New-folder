@@ -14,7 +14,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->nullable()->constrained('organizations')->restrictOnDelete();
             $t->string('name');
             $t->string('email')->nullable();

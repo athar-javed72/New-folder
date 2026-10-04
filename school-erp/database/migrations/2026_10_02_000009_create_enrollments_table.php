@@ -11,7 +11,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('enrollments', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('student_id');
             $t->ulid('campus_id');

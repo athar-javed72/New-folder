@@ -11,7 +11,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('families', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->string('family_code', 30);
             $t->string('display_name');
@@ -27,7 +28,8 @@ return new class extends Migration
         DB::statement("ALTER TABLE families ADD CONSTRAINT families_status_chk CHECK (status IN ('active','inactive'))");
 
         Schema::create('students', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('family_id');
             $t->string('registration_number', 40);
@@ -54,7 +56,8 @@ return new class extends Migration
         DB::statement('CREATE INDEX students_custom_gin_idx ON students USING gin (custom jsonb_path_ops)');
 
         Schema::create('guardians', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('family_id');
             $t->ulid('user_id')->nullable();       // portal login

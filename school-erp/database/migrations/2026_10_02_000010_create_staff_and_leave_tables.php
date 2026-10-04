@@ -14,7 +14,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employees', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('user_id')->nullable();
             $t->string('employee_code', 30);
@@ -35,7 +36,8 @@ return new class extends Migration
         DB::statement("ALTER TABLE employees ADD CONSTRAINT employees_status_chk CHECK (status IN ('active','inactive','left'))");
 
         Schema::create('contract_types', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->string('key', 50);                  // permanent, probation, fixed_term, visiting, part_time
             $t->string('name');
@@ -53,7 +55,8 @@ return new class extends Migration
         DB::statement("ALTER TABLE contract_types ADD CONSTRAINT contract_types_pay_basis_chk CHECK (pay_basis IN ('monthly','hourly','per_session','daily'))");
 
         Schema::create('leave_types', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->string('key', 50);                  // casual, sick, annual, unpaid
             $t->string('name');
@@ -66,7 +69,8 @@ return new class extends Migration
         });
 
         Schema::create('employment_contracts', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('employee_id');
             $t->ulid('campus_id');
@@ -110,7 +114,8 @@ EXCLUDE USING gist (
 SQL);
 
         Schema::create('leave_entitlements', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('contract_type_id');
             $t->ulid('leave_type_id');
@@ -133,7 +138,8 @@ SQL);
         DB::statement("ALTER TABLE leave_entitlements ADD CONSTRAINT leave_entitlements_carry_chk CHECK (carry_forward IN ('none','within_year','to_next_year'))");
 
         Schema::create('leave_ledgers', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->restrictOnDelete();
             $t->ulid('contract_id');
             $t->ulid('leave_type_id');

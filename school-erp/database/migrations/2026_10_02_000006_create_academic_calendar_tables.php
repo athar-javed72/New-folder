@@ -11,7 +11,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('programs', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->string('key', 50);                 // matric, cambridge, ib ...
             $t->string('name');
@@ -24,7 +25,8 @@ return new class extends Migration
         });
 
         Schema::create('academic_calendars', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('campus_id')->nullable();     // null = organization-wide
             $t->ulid('program_id');
@@ -45,7 +47,8 @@ return new class extends Migration
         DB::statement("CREATE UNIQUE INDEX academic_calendars_name_uq ON academic_calendars (organization_id, COALESCE(campus_id,'-'), program_id, name)");
 
         Schema::create('terms', function (Blueprint $t) {
-            $t->ulid('id')->primary();
+            $t->ulid('id');
+            $t->primary('id');   // explicit, so self-referencing FKs below can rely on it (fluent ->primary() is emitted last)
             $t->foreignUlid('organization_id')->constrained('organizations')->cascadeOnDelete();
             $t->ulid('academic_calendar_id');
             $t->string('key', 30);
