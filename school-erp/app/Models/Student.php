@@ -24,6 +24,11 @@ class Student extends Model
         return ['medical' => JsonDocument::class, 'custom' => JsonDocument::class, 'date_of_birth' => 'date', 'admission_date' => 'date'];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function family(): BelongsTo
     {
         return $this->belongsTo(Family::class);

@@ -23,6 +23,11 @@ class Enrollment extends Model
         return ['custom' => JsonDocument::class, 'start_date' => 'date', 'end_date' => 'date'];
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
@@ -33,6 +38,11 @@ class Enrollment extends Model
         return $this->belongsTo(Campus::class);
     }
 
+    public function academicCalendar(): BelongsTo
+    {
+        return $this->belongsTo(AcademicCalendar::class);
+    }
+
     public function grade(): BelongsTo
     {
         return $this->belongsTo(Grade::class);
@@ -41,5 +51,10 @@ class Enrollment extends Model
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
+    }
+
+    public function previousEnrollment(): BelongsTo
+    {
+        return $this->belongsTo(Enrollment::class, 'previous_enrollment_id');
     }
 }

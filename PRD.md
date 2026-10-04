@@ -26,7 +26,7 @@ Multi-school, multi-campus School ERP for Pakistani schools. Everything is confi
 - [x] Task 5: Seed. Run `php artisan migrate:fresh --seed`; expected line `Preset PK_GENERAL_V1@1.5: imported (17/17 policies created)`. Run `php artisan db:seed --class=PresetSeeder` again; expected `already present`. Verify in DB: `presets` = 1 row, `system_policies` = 17 rows, and the `grading_profile` value contains `"component_min_percent": {}` as an object.
 - [x] Task 6: Run `./vendor/bin/pest`. Expected: 39 unit tests and 18 database constraint tests pass. Golden numbers: late fee Day 8 = 55000, Day 15 = 90000; visiting payroll 22 sessions = 1760000; GPA credit_weighted 3.51 vs simple_average 3.57. If a test fails, report it; do not weaken the test.
 - [x] Task 7: Add `tests/Feature/PresetSeederTest.php`: first import creates 17 policies; second import creates 0; same version with changed content raises `PresetChecksumMismatch`.
-- [ ] Task 8: Add one Pest test that creates organization, campus, family, student and enrollment through Eloquent and reloads them. Fix only model bugs (casts, relations, fillable). Do not touch migrations.
+- [x] Task 8: Add one Pest test that creates organization, campus, family, student and enrollment through Eloquent and reloads them. Fix only model bugs (casts, relations, fillable). Do not touch migrations.
 - [ ] Task 9: Add Pint and Larastan (`larastan/larastan`, level 5), run both, fix style and type issues only. Done when: both pass and `pest` still passes.
 - [ ] Task 10: Write `.planning/STATE.md` summary (what exists, what passed, known gaps) and stop. Do NOT start Phase 2.
 
