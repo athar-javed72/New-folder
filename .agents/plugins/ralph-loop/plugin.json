@@ -1,0 +1,15 @@
+{
+  "name": "ralph-loop",
+  "version": "1.0.0",
+  "description": "Autonomous iterative development loop system for Antigravity based on the Ralph Wiggum stateless loop methodology. Eliminates context degradation and drives tasks to completion using external state (PRD.md, progress.txt).",
+  "author": {
+    "name": "Ralph Loop Contributors"
+  },
+  "keywords": [
+    "ralph-loop",
+    "autonomous",
+    "agentic-loop",
+    "stateless-context",
+    "antigravity"
+  ]
+}

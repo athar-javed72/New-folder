@@ -1,0 +1,17 @@
+{
+  "name": "gsd",
+  "version": "1.0.9",
+  "description": "Get Shit Done (GSD) spec-driven development workflow system for Antigravity — featuring Super Mode, Anti-Hallucination Q&A, and Project Memory protocols.",
+  "author": {
+    "name": "Arshad Khan (KhanXBT)"
+  },
+  "license": "MIT",
+  "keywords": [
+    "gsd",
+    "get-shit-done",
+    "spec-driven",
+    "antigravity",
+    "super-mode",
+    "workflows"
+  ]
+}

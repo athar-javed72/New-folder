@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "netlify": {
+      "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@netlify/mcp"
+      ],
+      "env": {
+        "NETLIFY_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "StitchMCP": {
+      "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://stitch.googleapis.com/mcp",
+        "--header",
+        "X-Goog-Api-Key: AQ.Ab8RN6JyUpeDt5x0U-g0XNrQ0YkixPr2txmoty5Uk66gGUc9aw"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {}
+    },
+    "serena": {
+      "command": "C:\\Users\\DELL\\AppData\\Roaming\\Python\\Python312\\Scripts\\uvx.exe",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}

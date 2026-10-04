@@ -1,0 +1,16 @@
+{
+  "name": "serena",
+  "version": "1.0.0",
+  "description": "Semantic code understanding, Language Server Protocol (LSP) symbol navigation, and precise cross-file refactoring MCP toolkit for Antigravity.",
+  "author": {
+    "name": "Oraios (Serena Contributors)"
+  },
+  "keywords": [
+    "serena",
+    "lsp",
+    "semantic-code",
+    "code-intelligence",
+    "refactoring",
+    "mcp"
+  ]
+}

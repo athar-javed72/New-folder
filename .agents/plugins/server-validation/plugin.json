@@ -1,0 +1,18 @@
+{
+  "name": "server-validation",
+  "version": "1.0.0",
+  "description": "Enterprise-grade server-side validation and OWASP input security plugin for Antigravity. Implements strict schema validation (Zod, Pydantic, ArkType), sanitization, unknown-parameter stripping, and standardized error responses.",
+  "author": {
+    "name": "Antigravity Security Engine"
+  },
+  "keywords": [
+    "server-side-validation",
+    "zod",
+    "pydantic",
+    "owasp",
+    "security",
+    "input-validation",
+    "sanitization",
+    "antigravity"
+  ]
+}

@@ -1,0 +1,10 @@
+<?php
+
+// Merge into the tests/Pest.php created by `./vendor/bin/pest --init`
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+// Unit tests: pure PHP (no framework boot, no database).
+// Feature tests: Laravel + PostgreSQL test database, rolled back after every test.
+pest()->extend(Tests\TestCase::class)
+    ->use(RefreshDatabase::class)
+    ->in('Feature');

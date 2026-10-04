@@ -1,0 +1,16 @@
+{
+  "name": "coderabbit",
+  "version": "1.0.0",
+  "description": "AI-powered code review, vulnerability detection, and automated PR feedback loop for Antigravity powered by CodeRabbit.",
+  "author": {
+    "name": "CodeRabbit"
+  },
+  "keywords": [
+    "coderabbit",
+    "code-review",
+    "security",
+    "autofix",
+    "code-quality",
+    "antigravity"
+  ]
+}

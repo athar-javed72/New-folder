@@ -1,0 +1,16 @@
+{
+  "name": "context7",
+  "version": "1.0.0",
+  "description": "Real-time, version-specific library documentation and verified API code examples MCP plugin powered by Upstash Context7.",
+  "author": {
+    "name": "Upstash"
+  },
+  "keywords": [
+    "context7",
+    "documentation",
+    "apis",
+    "mcp",
+    "anti-hallucination",
+    "upstash"
+  ]
+}

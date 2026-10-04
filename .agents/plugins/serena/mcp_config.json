@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "C:\\Users\\DELL\\AppData\\Roaming\\Python\\Python312\\Scripts\\uvx.exe",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}
