@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /*
@@ -13,8 +14,10 @@ use Tests\TestCase;
 |
 */
 
+// Unit tests: pure PHP (no framework boot, no database).
+// Feature tests: Laravel + PostgreSQL test database, rolled back after every test.
 pest()->extend(TestCase::class)
- // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
