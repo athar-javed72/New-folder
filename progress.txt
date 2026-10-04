@@ -6,3 +6,15 @@ Completed Tasks:
 ----------------
 - Task 1: Created Laravel 12 project in `./school-erp` (`laravel/framework v12.69.3`), installed Pest testing framework (`pestphp/pest v3.8.7`, `pestphp/pest-plugin-laravel v3.2.0`), initialized Pest (`tests/Pest.php`), verified `php artisan --version` (Laravel Framework 12.69.3) and `./vendor/bin/pest` (2 passed).
 - Task 2: Configured `.env` with PostgreSQL credentials (`school_erp` / `change_me`), updated `phpunit.xml` with `school_erp_test` DB configuration, merged `tests/Pest.php.example` into `tests/Pest.php` with `RefreshDatabase` for Feature tests, verified `btree_gist` extension in PostgreSQL, verified `php artisan migrate:status` connection, and passed `./vendor/bin/pint --test` and `./vendor/bin/pest`.
+
+BLOCKED:
+--------
+Task 3 failed during `php artisan migrate:fresh`:
+Migration: `2026_10_02_000005_create_access_control_tables`
+Error:
+SQLSTATE[42830]: Invalid foreign key: 7 ERROR: there is no unique constraint matching given keys for referenced table "role_assignments" (Connection: pgsql, Host: 127.0.0.1, Port: 5432, Database: school_erp, SQL: alter table "role_assignments" add constraint "role_assignments_parent_grant_id_foreign" foreign key ("parent_grant_id") references "role_assignments" ("id") on delete set null)
+
+Cause:
+In Laravel 12's PostgreSQL schema builder, self-referencing foreign keys defined in the same `Schema::create` closure (`$t->foreign('parent_grant_id')->references('id')->on('role_assignments')->nullOnDelete()`) generate an `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY` that executes before the primary key constraint (`ALTER TABLE ... ADD PRIMARY KEY ("id")`) is added to the table. In PostgreSQL, a table cannot reference itself via foreign key until its referenced column has a primary key or unique constraint.
+
+Hard Rule 1 invoked: Stopped execution. Do not edit, rename, or reorder migrations 2026_10_02_000001..000012 without user approval.
