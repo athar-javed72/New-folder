@@ -16,7 +16,7 @@ use InvalidArgumentException;
 final class ContractPayrollCalculator
 {
     /**
-     * @param  array{pay_basis:string, rate_minor:int, pay_rules?:array<string,string>}  $contract
+     * @param  array{pay_basis?:string, rate_minor:int, pay_rules?:array<string,string>}  $contract
      * @param  list<array{status:string, planned_teacher_id:string, actual_teacher_id?:?string, minutes?:int}>  $sessions
      * @return array{total_minor:int, lines:list<array{kind:string, sessions:int, minutes:int, amount_minor:int}>}
      */
