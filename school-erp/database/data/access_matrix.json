@@ -1,0 +1,1283 @@
+{
+  "_meta": {
+    "source": "docs/DECISIONS_PHASE2.md D-21, D-22",
+    "scope_mapping": {
+      "org": "org",
+      "campus": "campus",
+      "assigned": "section (resolver narrows to the user's assigned classes/sections/subjects)",
+      "self": "section (resolver narrows to own self or own children via guardian_student)"
+    },
+    "note": "System roles: organization_id NULL, is_system true. Org Admin and Super Admin are not listed; they bypass by definition (D-20)."
+  },
+  "permissions": [
+    {
+      "code": "academics.calendar.manage",
+      "module": "academics",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "academics.course.manage",
+      "module": "academics",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "academics.substitution.assign",
+      "module": "academics",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "academics.timetable.manage",
+      "module": "academics",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "academics.timetable.publish",
+      "module": "academics",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "access.role.assign",
+      "module": "access",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "access.role.manage",
+      "module": "access",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "attendance.student.edit_past",
+      "module": "attendance",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "attendance.student.mark",
+      "module": "attendance",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "attendance.student.view",
+      "module": "attendance",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "audit.log.view",
+      "module": "audit",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "comms.announcement.send",
+      "module": "comms",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "comms.sms.send_bulk",
+      "module": "comms",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "exams.datesheet.manage",
+      "module": "exams",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "exams.marks.edit_after_lock",
+      "module": "exams",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "exams.marks.enter",
+      "module": "exams",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "exams.promotion.decide",
+      "module": "exams",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "exams.results.publish",
+      "module": "exams",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "exams.results.view",
+      "module": "exams",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.discount.approve",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.discount.create",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.latefee.waive",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.payment.receive",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.payment.reverse",
+      "module": "fees",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "fees.refund.approve",
+      "module": "fees",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "fees.refund.request",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.report.view",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.structure.edit",
+      "module": "fees",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "fees.voucher.generate",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "fees.voucher.view",
+      "module": "fees",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "guardians.profile.edit",
+      "module": "guardians",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.attendance.mark",
+      "module": "hr",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.contract.manage",
+      "module": "hr",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.employee.edit",
+      "module": "hr",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.employee.view",
+      "module": "hr",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.leave.approve",
+      "module": "hr",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "hr.payroll.approve",
+      "module": "hr",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "hr.payroll.run",
+      "module": "hr",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "hr.salary.view",
+      "module": "hr",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "ledger.adjustment.post",
+      "module": "ledger",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "ledger.entry.view",
+      "module": "ledger",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "ledger.period.close",
+      "module": "ledger",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "org.campus.manage",
+      "module": "org",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "org.policy.edit",
+      "module": "org",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "org.policy.publish",
+      "module": "org",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "org.settings.edit",
+      "module": "org",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "pastoral.counselling.view",
+      "module": "pastoral",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "pastoral.medical.edit",
+      "module": "pastoral",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "pastoral.medical.view",
+      "module": "pastoral",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "pastoral.safeguarding.report",
+      "module": "pastoral",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "pastoral.safeguarding.view",
+      "module": "pastoral",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "portal.child.view",
+      "module": "portal",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "portal.fees.pay",
+      "module": "portal",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "portal.self.view",
+      "module": "portal",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "reports.data.export",
+      "module": "reports",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "reports.view.academic",
+      "module": "reports",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "students.admission.approve",
+      "module": "students",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "students.admission.create",
+      "module": "students",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "students.ids.view",
+      "module": "students",
+      "is_sensitive": true,
+      "is_delegable": false
+    },
+    {
+      "code": "students.lifecycle.transition",
+      "module": "students",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "students.profile.edit",
+      "module": "students",
+      "is_sensitive": false,
+      "is_delegable": true
+    },
+    {
+      "code": "students.profile.view",
+      "module": "students",
+      "is_sensitive": false,
+      "is_delegable": true
+    }
+  ],
+  "roles": [
+    {
+      "key": "campus_admin",
+      "name": "Campus Admin",
+      "permissions": [
+        {
+          "permission": "academics.calendar.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "academics.course.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "access.role.assign",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "audit.log.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "comms.announcement.send",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "comms.sms.send_bulk",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.discount.approve",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.latefee.waive",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.refund.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.report.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.structure.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.generate",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.voucher.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "guardians.profile.edit",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.contract.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.employee.edit",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.employee.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.leave.approve",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.payroll.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "ledger.entry.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "org.policy.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.data.export",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.view.academic",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.admission.approve",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.admission.create",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.lifecycle.transition",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.profile.edit",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": true
+        }
+      ]
+    },
+    {
+      "key": "principal",
+      "name": "Principal",
+      "permissions": [
+        {
+          "permission": "academics.calendar.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.course.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.substitution.assign",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "academics.timetable.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "academics.timetable.publish",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "access.role.assign",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.edit_past",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "comms.announcement.send",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "comms.sms.send_bulk",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.datesheet.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "exams.marks.edit_after_lock",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.promotion.decide",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.publish",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "fees.discount.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.discount.create",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.latefee.waive",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.refund.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.report.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "guardians.profile.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.employee.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.leave.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "ledger.entry.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.medical.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.data.export",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.view.academic",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "students.admission.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.admission.create",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.ids.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.lifecycle.transition",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "vice_principal",
+      "name": "Vice Principal",
+      "permissions": [
+        {
+          "permission": "academics.calendar.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.course.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.substitution.assign",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "academics.timetable.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "academics.timetable.publish",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.edit_past",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "comms.announcement.send",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.datesheet.manage",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "exams.results.publish",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "campus",
+          "with_grant": true
+        },
+        {
+          "permission": "hr.attendance.mark",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.leave.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.view.academic",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "academic_coordinator",
+      "name": "Academic Coordinator",
+      "permissions": [
+        {
+          "permission": "academics.calendar.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.course.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.substitution.assign",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "academics.timetable.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.edit_past",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "comms.announcement.send",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.datesheet.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.promotion.decide",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.publish",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "reports.view.academic",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "class_teacher",
+      "name": "Class Teacher",
+      "permissions": [
+        {
+          "permission": "attendance.student.mark",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "comms.announcement.send",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.marks.enter",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "assigned",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "subject_teacher",
+      "name": "Subject Teacher",
+      "permissions": [
+        {
+          "permission": "attendance.student.mark",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "attendance.student.view",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.marks.enter",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "assigned",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "assigned",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "admissions_officer",
+      "name": "Admissions Officer",
+      "permissions": [
+        {
+          "permission": "guardians.profile.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.admission.create",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.ids.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "accountant",
+      "name": "Accountant",
+      "permissions": [
+        {
+          "permission": "fees.discount.create",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.payment.receive",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.payment.reverse",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.refund.request",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.report.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.generate",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "ledger.adjustment.post",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "ledger.entry.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "ledger.period.close",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "cashier",
+      "name": "Cashier",
+      "permissions": [
+        {
+          "permission": "fees.payment.receive",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "hr_manager",
+      "name": "HR Manager",
+      "permissions": [
+        {
+          "permission": "hr.attendance.mark",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.contract.manage",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.employee.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.employee.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.leave.approve",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.payroll.run",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "hr.salary.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "nurse_counsellor",
+      "name": "Nurse / Counsellor",
+      "permissions": [
+        {
+          "permission": "pastoral.counselling.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.medical.edit",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.medical.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.report",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "pastoral.safeguarding.view",
+          "scope": "campus",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "campus",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "parent",
+      "name": "Parent",
+      "permissions": [
+        {
+          "permission": "attendance.student.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "fees.voucher.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "portal.child.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "portal.fees.pay",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "self",
+          "with_grant": false
+        }
+      ]
+    },
+    {
+      "key": "student",
+      "name": "Student",
+      "permissions": [
+        {
+          "permission": "attendance.student.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "exams.results.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "portal.self.view",
+          "scope": "self",
+          "with_grant": false
+        },
+        {
+          "permission": "students.profile.view",
+          "scope": "self",
+          "with_grant": false
+        }
+      ]
+    }
+  ],
+  "sod_rules": [
+    {
+      "permission_a": "fees.discount.approve",
+      "permission_b": "fees.discount.create",
+      "record_type": "fee_discount"
+    },
+    {
+      "permission_a": "fees.refund.approve",
+      "permission_b": "fees.refund.request",
+      "record_type": "refund"
+    },
+    {
+      "permission_a": "fees.payment.receive",
+      "permission_b": "fees.payment.reverse",
+      "record_type": "payment"
+    },
+    {
+      "permission_a": "hr.payroll.approve",
+      "permission_b": "hr.payroll.run",
+      "record_type": "payroll_run"
+    },
+    {
+      "permission_a": "exams.marks.edit_after_lock",
+      "permission_b": "exams.marks.enter",
+      "record_type": "marks_sheet"
+    },
+    {
+      "permission_a": "students.admission.approve",
+      "permission_b": "students.admission.create",
+      "record_type": "admission"
+    }
+  ]
+}
