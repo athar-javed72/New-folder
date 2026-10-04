@@ -28,7 +28,7 @@ Multi-school, multi-campus School ERP for Pakistani schools. Everything is confi
 - [x] Task 7: Add `tests/Feature/PresetSeederTest.php`: first import creates 17 policies; second import creates 0; same version with changed content raises `PresetChecksumMismatch`.
 - [x] Task 8: Add one Pest test that creates organization, campus, family, student and enrollment through Eloquent and reloads them. Fix only model bugs (casts, relations, fillable). Do not touch migrations.
 - [x] Task 9: Add Pint and Larastan (`larastan/larastan`, level 5), run both, fix style and type issues only. Done when: both pass and `pest` still passes.
-- [ ] Task 10: Write `.planning/STATE.md` summary (what exists, what passed, known gaps) and stop. Do NOT start Phase 2.
+- [x] Task 10: Write `.planning/STATE.md` summary (what exists, what passed, known gaps) and stop. Do NOT start Phase 2.
 
 ## Out of scope for this PRD
 Timetable and attendance engine, fees ledger, payroll runs, Access module logic, API endpoints, AI layer, frontend.
