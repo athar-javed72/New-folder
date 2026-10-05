@@ -16,7 +16,7 @@ Multi-school, multi-campus School ERP for Pakistani schools. Step 1 (schema, pre
 4. Tenant safety: every query on tenant data filters by `organization_id`. System roles have `organization_id` NULL.
 5. Sensitive permissions (`is_sensitive`) can only be granted by the Org Admin. Never set `with_grant` on a sensitive row in the matrix.
 6. Never weaken or delete an existing test. If one fails, report it.
-7. One task per turn. Verify, then one atomic git commit, then log to `progress.txt`. Do NOT push unless the user says so.
+7. One task per turn. Verify, log to progress.txt, then STOP. Never run git add, git commit or git push; the user commits.
 8. Verification gate for every PHP task: `php -l` on changed files, `./vendor/bin/pint --test`, `./vendor/bin/pest`, `./vendor/bin/phpstan analyse` (Larastan level 5). All must pass before commit.
 9. Do not build login, register or any HTTP endpoint in this PRD. API contracts are written first (separate doc).
 
