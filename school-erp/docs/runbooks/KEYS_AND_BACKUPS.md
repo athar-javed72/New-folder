@@ -35,7 +35,7 @@ Always generate keys on a secure workstation or target server. Never put real ke
 ## 4. Rotating `APP_KEY`
 
 1. Generate a new application key.
-2. Put the new key in `APP_KEY` and prepend the old key to `APP_PREVIOUS_KEYS` (comma-separated list, e.g., `APP_PREVIOUS_KEYS=old_key_1,old_key_2`).
+2. Put the new key in `APP_KEY` and prepend the old key to `APP_PREVIOUS_KEYS` (comma-separated list, e.g., `APP_PREVIOUS_KEYS=base64:OLD_KEY_1_PLACEHOLDER,base64:OLD_KEY_2_PLACEHOLDER`).
 3. Laravel will automatically decrypt old data with the previous key and encrypt new writes with the new key.
 4. Old rows stay encrypted with the old key until they are rewritten. The old key must stay in `APP_PREVIOUS_KEYS` until a re-encrypt command has rewritten every encrypted column.
 5. That re-encrypt command is **NOT built yet** (D-31). Do not remove the old key from `APP_PREVIOUS_KEYS` until that command exists, has been run, and has been verified.

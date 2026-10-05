@@ -12,9 +12,6 @@ use App\Services\Access\AccessResolver;
 use App\Services\Access\ScopeContext;
 use Illuminate\Support\Facades\DB;
 
-/**
- * @method static StudentMedicalProfile save(User $actor, Student $student, array $data, ScopeContext $scope, bool $severeAllergy = false)
- */
 final class StudentMedicalService
 {
     /**
@@ -113,15 +110,5 @@ final class StudentMedicalService
 
             return $profile;
         });
-    }
-
-    /**
-     * Handle static calls gracefully.
-     *
-     * @param  array<int, mixed>  $arguments
-     */
-    public static function __callStatic(string $method, array $arguments): mixed
-    {
-        return (new self)->$method(...$arguments);
     }
 }
