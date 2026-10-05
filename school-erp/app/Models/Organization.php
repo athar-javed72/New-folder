@@ -42,4 +42,12 @@ class Organization extends Model
     {
         return $this->hasMany(Enrollment::class);
     }
+
+    /**
+     * @return HasMany<Role, $this>
+     */
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
+    }
 }
