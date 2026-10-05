@@ -6,10 +6,16 @@ namespace App\Providers;
 
 use App\Models\Campus;
 use App\Models\ContractType;
+use App\Models\Employee;
 use App\Models\EmploymentContract;
 use App\Models\Grade;
+use App\Models\Guardian;
 use App\Models\Organization;
 use App\Models\Program;
+use App\Models\Student;
+use App\Models\StudentCustodyOrder;
+use App\Models\StudentMedicalProfile;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +34,12 @@ class MorphMapServiceProvider extends ServiceProvider
             'grade' => Grade::class,
             'contract_type' => ContractType::class,
             'employment_contract' => EmploymentContract::class,
+            'student' => Student::class,
+            'guardian' => Guardian::class,
+            'employee' => Employee::class,
+            'student_medical_profile' => StudentMedicalProfile::class,
+            'student_custody_order' => StudentCustodyOrder::class,
+            'user' => User::class,
         ]);
     }
 }
