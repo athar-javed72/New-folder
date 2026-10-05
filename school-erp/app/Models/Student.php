@@ -21,7 +21,7 @@ class Student extends Model
 
     protected function casts(): array
     {
-        return ['medical' => JsonDocument::class, 'custom' => JsonDocument::class, 'date_of_birth' => 'date', 'admission_date' => 'date'];
+        return ['custom' => JsonDocument::class, 'date_of_birth' => 'date', 'admission_date' => 'date'];
     }
 
     public function organization(): BelongsTo
