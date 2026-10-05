@@ -172,3 +172,32 @@ New policy `payment_allocation/default` in a NEW preset version **1.6** (presets
 | Advisory lock for receipt numbers | Rejected | It serializes exactly like the row lock; there is no contention gain. The fix is a short transaction with the number taken last (D-28). |
 | Separate `outbox_events` table | Rejected as duplicate | `domain_events` (migration 12) is already the outbox. The outbox idea itself is adopted (D-29 rule 6). |
 | `v1:` prefix on every ciphertext | Deferred | Laravel's `APP_PREVIOUS_KEYS` already decrypts old data during rotation and a re-encrypt command can loop over rows. A prefix would label rows but would not tie to a real key unless we also build a key map. Revisit with per-organization keys. |
+
+---
+
+## F. Phase 2B implementation decisions (privacy)
+
+### D-32 Plain `students.medical` is removed
+Step 1 left a plain `students.medical` jsonb column. It contradicts D-23 (medical details are encrypted). Migration `2026_10_07_000001_add_privacy_columns.php` drops it. The migration refuses to run if any row still has data in it, so nothing is lost silently. Medical details live only in `student_medical_profiles`.
+
+### D-33 Who may reveal what (every reveal writes `audit_logs` action `pii.viewed`)
+| Field group | Permission needed | Audit meta `field_group` |
+|---|---|---|
+| Student B-Form, passport | students.ids.view | student_ids |
+| Guardian CNIC | students.ids.view | guardian_national_id |
+| Employee CNIC | hr.employee.view | employee_national_id |
+| Medical profile (allergies, conditions, medications, doctor notes) | pastoral.medical.view | medical |
+| Custody / court order details | pastoral.safeguarding.view | custody |
+The audit row stores who, which subject (type and id) and the field group. It never stores the value. A denied attempt writes no `pii.viewed` row. Alert flags (D-25) are plain and need no permission.
+
+### D-34 Medical profile writes and alert flags
+- Saving a medical profile needs `pastoral.medical.edit` and writes an `audit_logs` row `pii.updated` (field group only, never values).
+- In the same transaction: `students.has_medical_alert` = true when any of allergies, conditions or medications is non-empty, else false. `students.has_severe_allergy` is set explicitly by the caller (default false); it is a human judgment, not computed from text.
+
+### D-35 Blind index key and normalization
+- `config/privacy.php` reads `BLIND_INDEX_KEY`. Outside the testing environment the app must fail loudly at first use if the key is missing or shorter than 32 characters. phpunit.xml carries a fixed test-only key.
+- Normalize: remove every character that is not a letter or digit, then uppercase. An empty result is treated as null (no hash stored).
+- Generate a key with: `php -r "echo base64_encode(random_bytes(32));"`. Never commit it.
+
+### D-36 Hidden attributes
+Ciphertext and hash columns are listed in each model's `$hidden`, so they never appear in JSON or arrays. Plain text is returned only through the PII viewer (D-33).

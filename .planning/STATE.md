@@ -62,7 +62,7 @@ Phase 1 (Step 1) & Phase 2A (Access Module) — **COMPLETED**
 
 ### Core Eloquent Models
 - **Access Models:** `Permission`, `Role`, `RolePermission`, `RoleAssignment`, `PermissionGrant`, `DelegationBoundary`, `SodRule`.
-- **Domain & System Models:** `User`, `Organization`, `Campus`, `AcademicCalendar`, `Grade`, `Family`, `Student`, `Enrollment`, `SystemPolicy`, `PolicyOverride`, `LeaveLedger`, `AuditLog`, `OutboxEvent`, `Preset`.
+- **Domain & System Models:** `User`, `Organization`, `Campus`, `AcademicCalendar`, `Grade`, `Family`, `Student`, `Enrollment`, `SystemPolicy`, `PolicyOverride`, `LeaveLedger`, `AuditLog`, `Preset`.
 - **Morph Aliases:** Configured in `MorphMapServiceProvider`.
 
 ---
