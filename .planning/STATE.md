@@ -84,7 +84,7 @@ Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€
 ## 2. What Passed
 
 ### Test Suite (`./vendor/bin/pest`)
-- **Total Tests:** 181 passed (1155 assertions).
+- **Total Tests:** 187 passed (1190 assertions).
 - **Unit Tests (60 tests):**
   - `AccessMatrixTest` (8 tests): Matrix invariants, code format, unique codes, scope types, no sensitive with_grant, SoD rules validation, 13 role keys, principal grant scope restrictions.
   - `BlindIndexTest` (12 tests): Dash/space stripping, case normalization, cross-tenant isolation, key sensitivity, output length, empty/null handling, key length enforcement without leaks.
@@ -94,14 +94,14 @@ Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€
   - `PolicyResolverTest` (7 tests): Hierarchy cascade, specificity, deep merge, date validity.
   - `PresetMapperTest` (7 tests): 17 policies, SHA-256 stability, JSON object preservation.
   - `ExampleTest` (1 test).
-- **Feature & Constraint Tests (121 tests):**
+- **Feature & Constraint Tests (127 tests):**
   - `PrivacyConstraintsTest` (17 tests): Dropped `medical` column verification, default flags, column-free inserts, duplicate and cross-tenant `b_form_hash` / `passport_hash`, soft-delete hash release, malformed hash check constraints, guardian and employee duplicate hash allowances, single medical profile constraint, cross-tenant composite FK rejection.
   - `EncryptedModelsTest` (10 tests): Ciphertext verification, round-trip decryption, formatted lookups, cross-org denial, empty lookup denial, serialization hiding, clearing, LogicException on missing org, mass-assignment ignoring, model relations.
   - `PiiViewerTest` (13 tests): Controlled access across all 5 methods, audit logging verification, permission denial, cross-tenant denial, campus-scoped isolation, exception message safety, transactional abort on audit failure, null-scope fail-closed assertion.
   - `StudentMedicalServiceTest` (11 tests): Profile creation and flag management, clearing flags, severe allergy argument tracking, permission/cross-tenant denial, upsert uniqueness (single row), meta privacy, ciphertext verification, doctor_notes isolation from alert flag, unknown key ignoring, transactional rollback on audit write failure.
-  - `AccessResolverTest` (9 tests): Campus isolation, expired/suspended assignments, section isolation, super admin bypass, cross-org denial, module enablement overrides, ceiling enforcement, direct grants.
-  - `DelegationServiceTest` (10 tests): Campus admin delegation, cross-campus denial, sensitive grant denial, org_admin sensitive grant, principal fees denial, cross-org denial, cascade revoke with audit logs, delegation boundaries max_scope cap, direct canGrant verification, unauthorized revoke denial.
-  - `SodGuardTest` (14 tests): Same-record dual action blocking, distinct actor allowance, distinct record allowance, data-driven tests across all 6 seeded system SoD pairs in both directions, org-specific rules, inactive rule handling, multi-tenant isolation, same permission repeated allowance, super admin enforcement.
+  - `AccessResolverTest` (10 tests): Campus isolation, expired/suspended assignments, section isolation, super admin bypass, cross-org denial, module enablement overrides, ceiling enforcement, direct grants, derived campus module enablement and rejection of unresolvable scopes (D-41).
+  - `DelegationServiceTest` (14 tests): Campus admin delegation, cross-campus denial, sensitive grant denial, org_admin sensitive grant, principal fees denial, cross-org denial, cascade revoke with audit logs, delegation boundaries max_scope cap, direct canGrant verification, unauthorized revoke denial, parent grant lifetime capping and no self-delegation (D-37, D-38), SELECT FOR UPDATE row locking and stale model handling (D-39), system role enforcement for org_admin (D-40), scope ID existence validation across tables (D-42).
+  - `SodGuardTest` (15 tests): Same-record dual action blocking, distinct actor allowance, distinct record allowance, data-driven tests across all 6 seeded system SoD pairs in both directions, org-specific rules, inactive rule handling, multi-tenant isolation, same permission repeated allowance, super admin enforcement, super admin with null organization with/without organizationId parameter (D-43).
   - `SodRulesConstraintTest` (4 tests): System & org rule inserts, reversed pair rejection (`permission_a >= permission_b`), duplicate system rule rejection, different record_type allowance.
   - `AccessSeederTest` (3 tests): Exact seed counts (62 permissions, 14 system roles, 6 SoD rules), idempotency across re-runs, sensitive grant constraints.
   - `HashingAndThrottlingTest` (7 tests): Rate limiter key generation, normalization, fallback, 5-attempt limit per minute, Argon2id hashing and verification.
@@ -142,6 +142,9 @@ The following consolidated known gaps remain out of scope for Phase 2B:
 8. **`delegation_boundaries.requires_approval` ignored (from 2A):** Bypassed pending multi-step workflow approval engine.
 9. **Audit row writing by feature modules (from 2A):** `SodGuard` is read-only. Feature modules must write the audit row named after the permission code upon executing an action and must invoke `SodGuard::assertAllowed()` prior to acting.
 10. **No per-IP aggregate login cap (from 2A):** Rate limiting is enforced per `email + IP` (5/min). An aggregate per-IP cap is deferred to be decided together with public API contracts.
+11. **grants made through a role assignment are not capped by the assignment's end date**
+12. **can() runs several queries per call, list endpoints must filter by scope in the query, never call can() per row**
+13. **SoD plus action are not yet atomic, to be solved in Phase 2C (record row lock and ActionGate)**
 
 ---
 

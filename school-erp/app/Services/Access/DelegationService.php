@@ -49,6 +49,11 @@ class DelegationService
             $endsAt,
             $reason,
         ): PermissionGrant {
+            // 0. Self-delegation check (D-38)
+            if (! $grantor->is_super_admin && $grantor->id === $grantee->id) {
+                throw new DelegationDeniedException('Self-delegation is not allowed.');
+            }
+
             // 1. Grantee must belong to an organization
             if ($grantee->organization_id === null) {
                 throw new DelegationDeniedException('Grantee must belong to an organization.');
@@ -60,6 +65,26 @@ class DelegationService
             }
 
             $orgId = $grantee->organization_id;
+
+            // Validate scope_id against table if table exists (D-42)
+            $scopeTable = match ($scopeType) {
+                'campus' => 'campuses',
+                'grade' => 'grades',
+                'section' => 'sections',
+                'program' => 'programs',
+                default => null, // 'org' has no scope_id; 'session' has no domain table
+            };
+
+            if ($scopeTable !== null) {
+                $exists = DB::table($scopeTable)
+                    ->where('organization_id', $orgId)
+                    ->where('id', $scopeId)
+                    ->exists();
+
+                if (! $exists) {
+                    throw new DelegationDeniedException("Scope ID '{$scopeId}' not found in organization for scope type '{$scopeType}'.");
+                }
+            }
 
             // 3. Validate scope type
             if (! in_array($scopeType, self::VALID_SCOPES, true)) {
@@ -83,8 +108,8 @@ class DelegationService
             // 5. Build target ScopeContext
             $campusId = match ($scopeType) {
                 'campus' => $scopeId,
-                'grade' => DB::table('grades')->where('id', $scopeId)->value('campus_id'),
-                'section' => DB::table('sections')->where('id', $scopeId)->value('campus_id'),
+                'grade' => DB::table('sections')->where('organization_id', $orgId)->where('grade_id', $scopeId)->value('campus_id'),
+                'section' => DB::table('sections')->where('organization_id', $orgId)->where('id', $scopeId)->value('campus_id'),
                 default => null,
             };
 
@@ -104,6 +129,29 @@ class DelegationService
             }
 
             $parentGrantId = $authority['grant_id'];
+
+            // Concurrency & lifetime cap from parent grant (D-37, D-39)
+            if ($parentGrantId !== null) {
+                /** @var PermissionGrant|null $parentGrant */
+                $parentGrant = PermissionGrant::query()
+                    ->where('id', $parentGrantId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($parentGrant === null || $parentGrant->status !== 'active') {
+                    throw new DelegationDeniedException('Parent grant is no longer active.');
+                }
+
+                if ($parentGrant->ends_at !== null && $parentGrant->ends_at <= $now) {
+                    throw new DelegationDeniedException('Parent grant has expired.');
+                }
+
+                if ($parentGrant->ends_at !== null) {
+                    if ($endsAt === null || $endsAt > $parentGrant->ends_at) {
+                        $endsAt = $parentGrant->ends_at;
+                    }
+                }
+            }
 
             // 7. Check delegation boundaries (Decision 5)
             $this->assertDelegationBoundaries($grantor, $grantee, $orgId, $scopeType);
@@ -162,14 +210,24 @@ class DelegationService
     public function revoke(User $actor, PermissionGrant $grant, ?string $reason = null): void
     {
         DB::transaction(function () use ($actor, $grant, $reason): void {
-            // 1. Authorization check (Decision 7)
-            if (! $this->canRevoke($actor, $grant)) {
+            /** @var PermissionGrant|null $freshGrant */
+            $freshGrant = PermissionGrant::query()
+                ->where('id', $grant->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($freshGrant === null || $freshGrant->status === 'revoked') {
+                return;
+            }
+
+            // 1. Authorization check (Decision 7 & D-40)
+            if (! $this->canRevoke($actor, $freshGrant)) {
                 throw new DelegationDeniedException('Actor is not authorized to revoke this grant.');
             }
 
             // 2. Cascade revoke
             $visited = [];
-            $this->revokeRecursively($actor, $grant, $reason, $visited);
+            $this->revokeRecursively($actor, $freshGrant, $reason, $visited);
         });
     }
 
@@ -194,6 +252,7 @@ class DelegationService
             ->where('role_assignments.organization_id', $grant->organization_id)
             ->where('role_assignments.user_id', $actor->id)
             ->where('roles.key', 'org_admin')
+            ->where('roles.is_system', true)
             ->where('role_assignments.scope_type', 'org')
             ->where('role_assignments.status', 'active')
             ->where('role_assignments.starts_at', '<=', $now)
@@ -250,6 +309,7 @@ class DelegationService
         /** @var Collection<int, PermissionGrant> $childGrants */
         $childGrants = PermissionGrant::query()
             ->where('parent_grant_id', $grant->id)
+            ->lockForUpdate()
             ->get();
 
         foreach ($childGrants as $child) {

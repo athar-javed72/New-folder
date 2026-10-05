@@ -253,3 +253,57 @@ it('grants permission via direct PermissionGrant regardless of max_scope', funct
     expect(AccessResolver::can($user, 'fees.discount.create', $ctxA))->toBeTrue();
     expect(AccessResolver::can($user, 'fees.discount.create', $ctxB))->toBeFalse();
 });
+
+it('derives campus from section or grade when checking module enablement and denies if unresolvable (D-41)', function () {
+    $orgId = F::org();
+    $campusA = F::campus($orgId);
+    $acA = F::academics($orgId, $campusA);
+
+    /** @var User $user */
+    $user = User::query()->find(F::user($orgId));
+    $permissionId = DB::table('permissions')->where('code', 'fees.voucher.view')->value('id');
+
+    // Give user an org-level grant for fees.voucher.view
+    PermissionGrant::query()->create([
+        'organization_id' => $orgId,
+        'user_id' => $user->id,
+        'permission_id' => $permissionId,
+        'scope_type' => 'org',
+        'scope_id' => null,
+        'status' => 'active',
+        'starts_at' => now()->subMinute(),
+        'ends_at' => null,
+    ]);
+
+    // Module enabled initially: works as before with sectionId or gradeId
+    $ctxSectionA = new ScopeContext(organizationId: $orgId, sectionId: $acA['section']);
+    $ctxGradeA = new ScopeContext(organizationId: $orgId, gradeId: $acA['grade']);
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxSectionA))->toBeTrue();
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxGradeA))->toBeTrue();
+
+    // Now disable fees module for campus A
+    DB::table('module_enablement')->insert([
+        'id' => F::id(),
+        'organization_id' => $orgId,
+        'campus_id' => $campusA,
+        'module' => 'fees',
+        'enabled' => false,
+        'source' => 'campus',
+    ]);
+
+    // ScopeContext with only sectionId in campus A is denied
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxSectionA))->toBeFalse();
+
+    // ScopeContext with only gradeId in campus A is denied
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxGradeA))->toBeFalse();
+
+    // Unknown section id is denied
+    $ctxUnknownSection = new ScopeContext(organizationId: $orgId, sectionId: F::id());
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxUnknownSection))->toBeFalse();
+
+    // Section in another campus where module is enabled works
+    $campusB = F::campus($orgId);
+    $acB = F::academics($orgId, $campusB);
+    $ctxSectionB = new ScopeContext(organizationId: $orgId, sectionId: $acB['section']);
+    expect(AccessResolver::can($user, 'fees.voucher.view', $ctxSectionB))->toBeTrue();
+});

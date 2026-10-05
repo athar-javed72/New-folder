@@ -16,16 +16,23 @@ class SodGuard
      *
      * @throws SeparationOfDutiesViolation
      */
-    public static function assertAllowed(User $actor, string $permission, string $recordType, string $recordId): void
-    {
+    public static function assertAllowed(
+        User $actor,
+        string $permission,
+        string $recordType,
+        string $recordId,
+        ?string $organizationId = null,
+    ): void {
+        $effectiveOrgId = $organizationId ?? $actor->organization_id;
+
         // 1. Look up active rules matching record_type and actor's org (or system rules)
         $rules = SodRule::query()
             ->where('is_active', true)
             ->where('record_type', $recordType)
-            ->where(function ($query) use ($actor) {
+            ->where(function ($query) use ($effectiveOrgId) {
                 $query->whereNull('organization_id');
-                if ($actor->organization_id !== null) {
-                    $query->orWhere('organization_id', $actor->organization_id);
+                if ($effectiveOrgId !== null) {
+                    $query->orWhere('organization_id', $effectiveOrgId);
                 }
             })
             ->where(function ($query) use ($permission) {
@@ -44,15 +51,17 @@ class SodGuard
                 ? $rule->permission_b
                 : $rule->permission_a;
 
-            $hasPerformedPaired = AuditLog::query()
-                ->where('organization_id', $actor->organization_id)
+            $auditQuery = AuditLog::query()
                 ->where('actor_id', $actor->id)
                 ->where('action', $pairedPermission)
                 ->where('subject_type', $recordType)
-                ->where('subject_id', $recordId)
-                ->exists();
+                ->where('subject_id', $recordId);
 
-            if ($hasPerformedPaired) {
+            if ($effectiveOrgId !== null) {
+                $auditQuery->where('organization_id', $effectiveOrgId);
+            }
+
+            if ($auditQuery->exists()) {
                 throw new SeparationOfDutiesViolation(
                     "Separation of duties violation: user '{$actor->id}' cannot perform '{$permission}' because they already performed paired permission '{$pairedPermission}' on {$recordType} '{$recordId}'."
                 );

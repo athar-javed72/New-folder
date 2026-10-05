@@ -173,6 +173,7 @@ class AccessResolver
                 ->where('role_assignments.organization_id', $orgId)
                 ->where('role_assignments.user_id', $user->id)
                 ->where('roles.key', 'org_admin')
+                ->where('roles.is_system', true)
                 ->where('role_assignments.scope_type', 'org')
                 ->where('role_assignments.status', 'active')
                 ->where('role_assignments.starts_at', '<=', $now)
@@ -258,10 +259,44 @@ class AccessResolver
      */
     private static function isModuleEnabled(string $orgId, string $module, ?ScopeContext $ctx): bool
     {
-        if ($ctx?->campusId !== null) {
+        $campusId = $ctx?->campusId;
+
+        // D-41: If no campusId but sectionId or gradeId is given, derive campus from database
+        if ($campusId === null && $ctx !== null) {
+            if ($ctx->sectionId !== null) {
+                $campusId = DB::table('sections')
+                    ->where('organization_id', $orgId)
+                    ->where('id', $ctx->sectionId)
+                    ->value('campus_id');
+
+                if ($campusId === null) {
+                    return false;
+                }
+            } elseif ($ctx->gradeId !== null) {
+                $gradeExists = DB::table('grades')
+                    ->where('organization_id', $orgId)
+                    ->where('id', $ctx->gradeId)
+                    ->exists();
+
+                if (! $gradeExists) {
+                    return false;
+                }
+
+                $campusId = DB::table('sections')
+                    ->where('organization_id', $orgId)
+                    ->where('grade_id', $ctx->gradeId)
+                    ->value('campus_id');
+
+                if ($campusId === null) {
+                    return false;
+                }
+            }
+        }
+
+        if ($campusId !== null) {
             $campusRow = DB::table('module_enablement')
                 ->where('organization_id', $orgId)
-                ->where('campus_id', $ctx->campusId)
+                ->where('campus_id', $campusId)
                 ->where('module', $module)
                 ->first();
 

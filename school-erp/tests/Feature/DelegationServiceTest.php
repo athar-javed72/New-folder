@@ -17,6 +17,9 @@ use App\Services\Access\DelegationService;
 use App\Services\Access\ScopeContext;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\DbFactory as F;
 
 beforeEach(function () {
@@ -471,4 +474,308 @@ it('denies unauthorized users from revoking a grant and allows super admin / org
     $service->revoke($superAdmin, $grant2, 'Revoked by super admin');
     $grant2->refresh();
     expect($grant2->status)->toBe('revoked');
+});
+
+it('caps child grant ends_at by parent grant ends_at and denies self-delegation (D-37, D-38)', function () {
+    $orgId = F::org();
+    $campus = F::campus($orgId);
+
+    /** @var User $campusAdmin */
+    $campusAdmin = User::query()->find(F::user($orgId));
+    /** @var User $teacherA */
+    $teacherA = User::query()->find(F::user($orgId));
+    /** @var User $teacherB */
+    $teacherB = User::query()->find(F::user($orgId));
+
+    /** @var Role $campusAdminRole */
+    $campusAdminRole = Role::query()->where('key', 'campus_admin')->firstOrFail();
+    assignTestRole($campusAdmin, $campusAdminRole, 'campus', $campus);
+
+    $service = new DelegationService;
+
+    // Self-grant is denied for normal user
+    expect(fn () => $service->grant(
+        grantor: $campusAdmin,
+        grantee: $campusAdmin,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+    ))->toThrow(DelegationDeniedException::class, 'Self-delegation is not allowed.');
+
+    // Super admin may self-grant
+    /** @var User $superAdmin */
+    $superAdmin = User::query()->find(F::user($orgId));
+    $superAdmin->is_super_admin = true;
+
+    $superSelfGrant = $service->grant(
+        grantor: $superAdmin,
+        grantee: $superAdmin,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+    );
+    expect($superSelfGrant->user_id)->toBe($superAdmin->id);
+
+    // Parent grant with ends_at in 10 days
+    $parentEndsAt = now()->addDays(10)->startOfSecond();
+    $parentGrant = $service->grant(
+        grantor: $campusAdmin,
+        grantee: $teacherA,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+        withGrant: true,
+        endsAt: $parentEndsAt,
+    );
+
+    // Child with null ends_at gets the parent's ends_at
+    $childNull = $service->grant(
+        grantor: $teacherA,
+        grantee: $teacherB,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+        endsAt: null,
+    );
+    expect($childNull->ends_at?->toIso8601String())->toBe($parentEndsAt->toIso8601String());
+
+    // Child later than parent is capped and audit shows capped value
+    $requestedLater = now()->addDays(20)->startOfSecond();
+    $childLater = $service->grant(
+        grantor: $teacherA,
+        grantee: $teacherB,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+        endsAt: $requestedLater,
+    );
+    expect($childLater->ends_at?->toIso8601String())->toBe($parentEndsAt->toIso8601String());
+
+    $auditRow = AuditLog::query()
+        ->where('action', 'access.grant.created')
+        ->where('subject_id', $childLater->id)
+        ->firstOrFail();
+    expect(Carbon::parse((string) $auditRow->after['ends_at'])->format('Y-m-d H:i:s'))->toBe($parentEndsAt->format('Y-m-d H:i:s'));
+
+    // Child earlier than parent keeps its own date
+    $requestedEarlier = now()->addDays(5)->startOfSecond();
+    $childEarlier = $service->grant(
+        grantor: $teacherA,
+        grantee: $teacherB,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+        endsAt: $requestedEarlier,
+    );
+    expect($childEarlier->ends_at?->toIso8601String())->toBe($requestedEarlier->toIso8601String());
+});
+
+it('locks parent grant and revoke targets FOR UPDATE and ignores stale revoked models (D-39)', function () {
+    $orgId = F::org();
+    $campus = F::campus($orgId);
+
+    /** @var User $campusAdmin */
+    $campusAdmin = User::query()->find(F::user($orgId));
+    /** @var User $teacherA */
+    $teacherA = User::query()->find(F::user($orgId));
+    /** @var User $teacherB */
+    $teacherB = User::query()->find(F::user($orgId));
+
+    /** @var Role $campusAdminRole */
+    $campusAdminRole = Role::query()->where('key', 'campus_admin')->firstOrFail();
+    assignTestRole($campusAdmin, $campusAdminRole, 'campus', $campus);
+
+    $service = new DelegationService;
+
+    $parentGrant = $service->grant(
+        grantor: $campusAdmin,
+        grantee: $teacherA,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+        withGrant: true,
+        endsAt: now()->addDays(10),
+    );
+
+    // Track SQL queries during grant with parent
+    $executedQueries = [];
+    DB::listen(function ($query) use (&$executedQueries) {
+        $executedQueries[] = $query->sql;
+    });
+
+    $childGrant = $service->grant(
+        grantor: $teacherA,
+        grantee: $teacherB,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campus,
+    );
+
+    $hasLockForUpdateOnGrant = collect($executedQueries)->contains(function ($sql) {
+        return str_contains(strtolower($sql), 'for update') && str_contains(strtolower($sql), 'permission_grants');
+    });
+    expect($hasLockForUpdateOnGrant)->toBeTrue();
+
+    // Track SQL queries during revoke
+    $revokeQueries = [];
+    DB::listen(function ($query) use (&$revokeQueries) {
+        $revokeQueries[] = $query->sql;
+    });
+
+    $service->revoke($teacherA, $childGrant, 'Revoking child');
+
+    $hasLockForUpdateOnRevoke = collect($revokeQueries)->contains(function ($sql) {
+        return str_contains(strtolower($sql), 'for update') && str_contains(strtolower($sql), 'permission_grants');
+    });
+    expect($hasLockForUpdateOnRevoke)->toBeTrue();
+
+    // Calling revoke with a stale model of an already revoked grant writes no second audit row
+    $auditCountBefore = AuditLog::query()->where('action', 'access.grant.revoked')->count();
+    $service->revoke($teacherA, $childGrant, 'Duplicate revoke attempt');
+    $auditCountAfter = AuditLog::query()->where('action', 'access.grant.revoked')->count();
+    expect($auditCountAfter)->toBe($auditCountBefore);
+});
+
+it('requires roles.is_system = true for org_admin power (D-40)', function () {
+    $orgId = F::org();
+    /** @var User $fakeOrgAdminUser */
+    $fakeOrgAdminUser = User::query()->find(F::user($orgId));
+    /** @var User $realOrgAdminUser */
+    $realOrgAdminUser = User::query()->find(F::user($orgId));
+    /** @var User $grantee */
+    $grantee = User::query()->find(F::user($orgId));
+
+    // Create a non-system role with key org_admin
+    $fakeRole = Role::query()->create([
+        'organization_id' => $orgId,
+        'key' => 'org_admin',
+        'name' => 'Custom Org Admin',
+        'is_system' => false,
+    ]);
+
+    $sensitivePerm = Permission::query()->where('code', 'audit.log.view')->firstOrFail();
+    DB::table('role_permissions')->insert([
+        'role_id' => $fakeRole->id,
+        'permission_id' => $sensitivePerm->id,
+        'max_scope' => 'org',
+        'with_grant' => true,
+    ]);
+
+    assignTestRole($fakeOrgAdminUser, $fakeRole, 'org', null);
+
+    /** @var Role $realRole */
+    $realRole = Role::query()->where('key', 'org_admin')->where('is_system', true)->firstOrFail();
+    assignTestRole($realOrgAdminUser, $realRole, 'org', null);
+
+    $service = new DelegationService;
+
+    // Fake org_admin cannot grant sensitive permission
+    expect(fn () => $service->grant(
+        grantor: $fakeOrgAdminUser,
+        grantee: $grantee,
+        permission: 'audit.log.view',
+        scopeType: 'org',
+    ))->toThrow(DelegationDeniedException::class);
+
+    // Real system org_admin can grant sensitive permission
+    $grant = $service->grant(
+        grantor: $realOrgAdminUser,
+        grantee: $grantee,
+        permission: 'audit.log.view',
+        scopeType: 'org',
+    );
+    expect($grant->id)->not->toBeNull();
+
+    // Fake org_admin cannot revoke real grant
+    expect(fn () => $service->revoke($fakeOrgAdminUser, $grant))
+        ->toThrow(DelegationDeniedException::class, 'Actor is not authorized to revoke this grant.');
+
+    // Real system org_admin can revoke
+    $service->revoke($realOrgAdminUser, $grant, 'Revoked by real org admin');
+    $grant->refresh();
+    expect($grant->status)->toBe('revoked');
+});
+
+it('validates scope_id existence in grantee organization for tables (D-42)', function () {
+    $orgA = F::org();
+    $orgB = F::org();
+
+    $campusA = F::campus($orgA);
+    $campusB = F::campus($orgB);
+
+    $acA = F::academics($orgA, $campusA);
+    $acB = F::academics($orgB, $campusB);
+
+    /** @var User $grantor */
+    $grantor = User::query()->find(F::user($orgA));
+    /** @var User $grantee */
+    $grantee = User::query()->find(F::user($orgA));
+
+    /** @var Role $orgAdminRole */
+    $orgAdminRole = Role::query()->where('key', 'org_admin')->where('is_system', true)->firstOrFail();
+    assignTestRole($grantor, $orgAdminRole, 'org', null);
+
+    $service = new DelegationService;
+
+    // Nonexistent scope_id rejected
+    expect(fn () => $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: (string) Str::ulid(),
+    ))->toThrow(DelegationDeniedException::class, 'not found in organization');
+
+    // Scope_id from another organization rejected
+    expect(fn () => $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campusB,
+    ))->toThrow(DelegationDeniedException::class, 'not found in organization');
+
+    expect(fn () => $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'grade',
+        scopeId: $acB['grade'],
+    ))->toThrow(DelegationDeniedException::class, 'not found in organization');
+
+    expect(fn () => $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'section',
+        scopeId: $acB['section'],
+    ))->toThrow(DelegationDeniedException::class, 'not found in organization');
+
+    // Valid ones accepted for campus, grade, and section
+    $grantCampus = $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'campus',
+        scopeId: $campusA,
+    );
+    expect($grantCampus->scope_type)->toBe('campus');
+
+    $grantGrade = $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'grade',
+        scopeId: $acA['grade'],
+    );
+    expect($grantGrade->scope_type)->toBe('grade');
+
+    $grantSection = $service->grant(
+        grantor: $grantor,
+        grantee: $grantee,
+        permission: 'comms.announcement.send',
+        scopeType: 'section',
+        scopeId: $acA['section'],
+    );
+    expect($grantSection->scope_type)->toBe('section');
 });

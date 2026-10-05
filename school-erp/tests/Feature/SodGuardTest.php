@@ -266,3 +266,39 @@ it('enforces SoD rules for super admin as well', function () {
     expect(fn () => SodGuard::assertAllowed($superAdmin, 'fees.discount.approve', 'fee_discount', $recordId))
         ->toThrow(SeparationOfDutiesViolation::class);
 });
+
+it('blocks super admin with null organization with or without organizationId parameter (D-43)', function () {
+    $orgId = F::org();
+    $superAdmin = new User([
+        'organization_id' => null,
+        'name' => 'Super Admin',
+        'email' => 'super_sod_d43@example.test',
+        'password' => 'secret',
+    ]);
+    $superAdmin->forceFill(['is_super_admin' => true])->save();
+
+    $recordId = F::id();
+
+    // Super admin performs permission A on a record with organization_id set
+    AuditLog::query()->create([
+        'organization_id' => $orgId,
+        'actor_id' => $superAdmin->id,
+        'action' => 'fees.discount.create',
+        'subject_type' => 'fee_discount',
+        'subject_id' => $recordId,
+        'meta' => [],
+    ]);
+
+    // Blocked from paired permission B when organizationId is passed
+    expect(fn () => SodGuard::assertAllowed($superAdmin, 'fees.discount.approve', 'fee_discount', $recordId, $orgId))
+        ->toThrow(SeparationOfDutiesViolation::class);
+
+    // Blocked also when organizationId is NOT passed (4-argument call)
+    expect(fn () => SodGuard::assertAllowed($superAdmin, 'fees.discount.approve', 'fee_discount', $recordId))
+        ->toThrow(SeparationOfDutiesViolation::class);
+
+    // Existing 4-argument calls on a different record still work
+    $otherRecord = F::id();
+    SodGuard::assertAllowed($superAdmin, 'fees.discount.approve', 'fee_discount', $otherRecord);
+    expect(true)->toBeTrue();
+});

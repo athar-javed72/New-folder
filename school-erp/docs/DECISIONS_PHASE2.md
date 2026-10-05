@@ -201,3 +201,29 @@ The audit row stores who, which subject (type and id) and the field group. It ne
 
 ### D-36 Hidden attributes
 Ciphertext and hash columns are listed in each model's `$hidden`, so they never appear in JSON or arrays. Plain text is returned only through the PII viewer (D-33).
+
+---
+
+## G. Access hardening (D-37 to D-43)
+
+### D-37 Delegated grant lifetime
+A grant created from a parent grant can never outlive it. Final `ends_at` = the requested `ends_at`, but if the parent grant has an `ends_at` and the requested one is null or later, use the parent's `ends_at`. Role-sourced grants are not capped yet (known gap).
+
+### D-38 No self-delegation
+Grantor and grantee must be different users, unless the grantor is a super admin.
+
+### D-39 Concurrency
+Inside the transaction, `grant()` locks the parent grant row with `FOR UPDATE` and re-checks it is still active and not expired. `revoke()` reloads the grant with `FOR UPDATE` inside its transaction before changing it, so a stale model never decides.
+
+### D-40 System org_admin check
+Every `org_admin` check (in `resolveGrantAuthority` for sensitive permissions, and in `DelegationService::canRevoke`) must also require `roles.is_system = true`, so a tenant-made role named `org_admin` gets no power.
+
+### D-41 Module enablement
+If the `ScopeContext` has no `campusId` but has a `sectionId` or `gradeId`, derive the campus from the database (`grades` or `sections` table, filtered by `organization_id`) before checking `module_enablement`. If the campus cannot be derived (id not found in this organization), deny.
+
+### D-42 Scope ID validation
+`grant()` must validate `scope_id`: for every scope type that has a table (`campus`, `grade`, `section`, and `program` or `session` if their tables exist), the row must exist in the grantee's organization, otherwise throw `DelegationDeniedException`. Look up the real table names from the migrations. If a scope type has no table, skip it and list it in `progress.txt`.
+
+### D-43 SoD check scope and super admin
+`SodGuard::assertAllowed` gets an optional last parameter `?string $organizationId = null`. The audit lookup filters by `organization_id` only when `($organizationId ?? $actor->organization_id)` is not null; otherwise it filters by `actor_id`, `action`, `subject_type` and `subject_id` only (ULIDs are globally unique). A super admin with a null organization must therefore still be blocked.
+
