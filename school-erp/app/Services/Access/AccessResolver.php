@@ -15,7 +15,7 @@ class AccessResolver
      *
      * @var array<string, int>
      */
-    private const SCOPE_RANKS = [
+    public const SCOPE_RANKS = [
         'org' => 1,
         'campus' => 2,
         'program' => 3,
@@ -81,7 +81,7 @@ class AccessResolver
 
         foreach ($assignments as $assignment) {
             // Ceiling rule: assignment scope cannot be wider than the role_permission's max_scope
-            if (self::isWider((string) $assignment->scope_type, (string) $assignment->max_scope)) {
+            if (self::isScopeWider((string) $assignment->scope_type, (string) $assignment->max_scope)) {
                 continue;
             }
 
@@ -118,6 +118,141 @@ class AccessResolver
     }
 
     /**
+     * Determine whether a user holds grant authority for a permission within a given scope context.
+     */
+    public static function canGrant(User $user, string $permission, ?ScopeContext $scope = null): bool
+    {
+        return self::resolveGrantAuthority($user, $permission, $scope) !== null;
+    }
+
+    /**
+     * Resolve the grantor's authority for granting a permission:
+     * - Returns ['source' => 'super_admin'|'role', 'grant_id' => null] if from super admin or role assignment.
+     * - Returns ['source' => 'grant', 'grant_id' => string] if from a permission grant.
+     * - Returns null if not authorized.
+     *
+     * @return array{source: string, grant_id: ?string}|null
+     */
+    public static function resolveGrantAuthority(User $user, string $permission, ?ScopeContext $scope = null): ?array
+    {
+        // 1. Super admin passes unconditionally
+        if ($user->is_super_admin) {
+            return ['source' => 'super_admin', 'grant_id' => null];
+        }
+
+        // 2. Non-super admin must have an organization
+        if ($user->organization_id === null) {
+            return null;
+        }
+
+        $orgId = $user->organization_id;
+
+        // 3. If context specifies an organization, it must match user's organization
+        if ($scope?->organizationId !== null && $scope->organizationId !== $orgId) {
+            return null;
+        }
+
+        // 4. Check module enablement (first segment of permission code)
+        $module = explode('.', $permission)[0];
+        if (! self::isModuleEnabled($orgId, $module, $scope)) {
+            return null;
+        }
+
+        // 5. Look up permission record
+        $permissionRecord = Permission::query()->where('code', $permission)->first();
+        if ($permissionRecord === null) {
+            return null;
+        }
+
+        $now = now();
+
+        // 6. Sensitive permission check: only active org_admin at org scope (or super_admin) may grant
+        if ($permissionRecord->is_sensitive) {
+            $isOrgAdmin = DB::table('role_assignments')
+                ->join('roles', 'role_assignments.role_id', '=', 'roles.id')
+                ->where('role_assignments.organization_id', $orgId)
+                ->where('role_assignments.user_id', $user->id)
+                ->where('roles.key', 'org_admin')
+                ->where('role_assignments.scope_type', 'org')
+                ->where('role_assignments.status', 'active')
+                ->where('role_assignments.starts_at', '<=', $now)
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('role_assignments.ends_at')
+                        ->orWhere('role_assignments.ends_at', '>', $now);
+                })
+                ->exists();
+
+            if (! $isOrgAdmin) {
+                return null;
+            }
+        }
+
+        // 7. Check active role assignments with with_grant = true
+        $assignments = DB::table('role_assignments')
+            ->join('role_permissions', 'role_assignments.role_id', '=', 'role_permissions.role_id')
+            ->where('role_assignments.organization_id', $orgId)
+            ->where('role_assignments.user_id', $user->id)
+            ->where('role_assignments.status', 'active')
+            ->where('role_assignments.starts_at', '<=', $now)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('role_assignments.ends_at')
+                    ->orWhere('role_assignments.ends_at', '>', $now);
+            })
+            ->where('role_permissions.permission_id', $permissionRecord->id)
+            ->where('role_permissions.with_grant', true)
+            ->select([
+                'role_assignments.scope_type',
+                'role_assignments.scope_id',
+                'role_permissions.max_scope',
+            ])
+            ->get();
+
+        foreach ($assignments as $assignment) {
+            // Ceiling rule: assignment scope cannot be wider than the role_permission's max_scope
+            if (self::isScopeWider((string) $assignment->scope_type, (string) $assignment->max_scope)) {
+                continue;
+            }
+
+            // Coverage rule: check if assignment scope covers the context
+            if (self::covers((string) $assignment->scope_type, $assignment->scope_id !== null ? (string) $assignment->scope_id : null, $scope)) {
+                return ['source' => 'role', 'grant_id' => null];
+            }
+        }
+
+        // 8. Sensitive permissions cannot be granted via permission grants (only org_admin role or super admin)
+        if ($permissionRecord->is_sensitive) {
+            return null;
+        }
+
+        // 9. Check active permission grants with with_grant = true
+        $grants = DB::table('permission_grants')
+            ->where('organization_id', $orgId)
+            ->where('user_id', $user->id)
+            ->where('permission_id', $permissionRecord->id)
+            ->where('status', 'active')
+            ->where('with_grant', true)
+            ->where('starts_at', '<=', $now)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>', $now);
+            })
+            ->select([
+                'id',
+                'scope_type',
+                'scope_id',
+            ])
+            ->get();
+
+        foreach ($grants as $grant) {
+            if (self::covers((string) $grant->scope_type, $grant->scope_id !== null ? (string) $grant->scope_id : null, $scope)) {
+                return ['source' => 'grant', 'grant_id' => (string) $grant->id];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Check if module is enabled in module_enablement.
      * A campus row overrides the org row; no row means enabled.
      */
@@ -151,7 +286,7 @@ class AccessResolver
     /**
      * Returns true if scopeA is wider than scopeB (lower rank number = wider).
      */
-    private static function isWider(string $scopeA, string $scopeB): bool
+    public static function isScopeWider(string $scopeA, string $scopeB): bool
     {
         $rankA = self::SCOPE_RANKS[$scopeA] ?? 99;
         $rankB = self::SCOPE_RANKS[$scopeB] ?? 99;

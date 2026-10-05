@@ -124,13 +124,13 @@ it('ensures section-scoped teacher passes only for the assigned section', functi
 });
 
 it('allows super admin to pass unconditionally', function () {
-    $superAdmin = User::query()->create([
+    $superAdmin = new User([
         'organization_id' => null,
         'name' => 'Super Admin',
         'email' => 'super@example.test',
         'password' => 'secret',
-        'is_super_admin' => true,
     ]);
+    $superAdmin->forceFill(['is_super_admin' => true])->save();
 
     $orgId = F::org();
     $campusId = F::campus($orgId);
