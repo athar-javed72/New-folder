@@ -443,3 +443,28 @@ it('aborts value reveal if audit log insertion fails within transaction', functi
     // Nothing was committed
     expect(AuditLog::query()->count())->toBe(0);
 });
+
+it('denies campus-scoped permission holder when scope context is null', function () {
+    $orgId = F::org();
+    $campus = F::campus($orgId);
+    $family = createViewerTestFamily($orgId);
+
+    $actor = createViewerTestUser($orgId);
+    grantViewerPermission($actor, 'students.ids.view', 'campus', $campus);
+
+    $student = new Student;
+    $student->id = F::id();
+    $student->organization_id = $orgId;
+    $student->family_id = $family->id;
+    $student->registration_number = 'REG'.substr($student->id, -8);
+    $student->first_name = 'Student';
+    $student->setBForm('00000-0000011-1');
+    $student->save();
+
+    $viewer = new PiiViewer;
+
+    expect(fn () => $viewer->studentIds($actor, $student, null))
+        ->toThrow(PiiAccessDenied::class);
+
+    expect(AuditLog::query()->count())->toBe(0);
+});
