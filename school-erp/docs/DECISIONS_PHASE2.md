@@ -227,3 +227,80 @@ If the `ScopeContext` has no `campusId` but has a `sectionId` or `gradeId`, deri
 ### D-43 SoD check scope and super admin
 `SodGuard::assertAllowed` gets an optional last parameter `?string $organizationId = null`. The audit lookup filters by `organization_id` only when `($organizationId ?? $actor->organization_id)` is not null; otherwise it filters by `actor_id`, `action`, `subject_type` and `subject_id` only (ULIDs are globally unique). A super admin with a null organization must therefore still be blocked.
 
+
+---
+
+## H. Phase 2C-1 implementation decisions (ledger core)
+
+### D-44 Phase 2C is built in four PRDs
+2C-1 ledger core (accounts, periods, journal, number sequences, posting service, reports). 2C-2 fee setup and vouchers (fee heads, structures, charges, vouchers, voucher lines). 2C-3 payments (payments, allocations, reversals, gateway events, idempotency, preset v1.6). 2C-4 discounts, refunds and adjustments (needs the workflow engine). 2C-1 moves no money by itself; it is the engine the other three post into.
+
+### D-45 Ledger periods
+- Periods belong to an organization, are date ranges, and cannot overlap (GiST exclusion constraint). Campuses share the organization's periods.
+- A period is created automatically as a calendar month (name `YYYY-MM`) the first time something posts on a date that has no period. The insert uses `ON CONFLICT DO NOTHING` and then re-selects, so two concurrent first postings are safe. Custom date ranges are not built now.
+- Closed is final: a trigger blocks any change to a closed period, including reopening. A mistake in a closed period is corrected by a reversal posted into the current open period.
+- Closing needs `ledger.period.close` (sensitive, not delegable) and writes `audit_logs` action `ledger.period.closed`. Closing an already closed period is a no-op (no second audit row).
+- The entry-insert trigger takes the period row `FOR SHARE`, so a close waits for postings still in flight. Period dates cannot change once entries exist.
+
+### D-46 Journal entries
+- An entry declares its shape (`line_count`, `total_minor`) and a `lines_hash` (sha256 of the canonical lines plus the campus; the date and memo are NOT part of it). A DEFERRED constraint trigger checks at COMMIT that the real lines match the declared count, debit equals credit and the total matches. Lines added to a finished entry in a later transaction therefore fail.
+- Entries and lines are append-only. Corrections are reversals, never edits.
+- One source posts once and is reversed once: unique `(organization_id, source_type, source_id, kind)`. `source_type` is a lowercase snake_case alias (for example `payment`, `voucher`, `refund`, `adjustment`) and `source_id` is the ULID of the source row.
+- A reversal has the same `source_type`, `source_id` and campus as its posting, `kind = 'reversal'`, `reversal_of` = the posting, the same line count and total, and each line swapped (debit becomes credit) on the same account and family. A reversal of a reversal is not allowed. The reversal is dated today (or a later date), never before the original, and lands in the period that contains that date.
+- The poster forces the deferred check at the end of every `post()` and `reverse()` with `SET CONSTRAINTS journal_entries_balanced, journal_lines_balanced IMMEDIATE`, then sets them back to DEFERRED. Errors therefore appear inside the service call, and tests that run inside the RefreshDatabase transaction still exercise the trigger.
+- A single currency per organization (`organizations.currency`); the ledger stores no currency column. Amounts are `bigint` paisa, never floats.
+- `created_by` is a plain FK to `users` (a super admin has no organization, so a composite FK would block them).
+
+### D-47 Journal lines
+A line has exactly one of debit or credit above zero. At least two lines per entry. The account must belong to the organization (composite FK) and be active. An account with `requires_family = true` needs `family_id` on every line (sub-ledger). The line carries no campus or student column (the entry carries the campus; student level reporting comes from voucher lines in 2C-2). The account `type` cannot change once the account has lines.
+
+### D-48 Accounts and the default chart
+- Types: asset, liability, income, expense, equity. Debit-normal: asset, expense. Credit-normal: liability, income, equity.
+- Services find accounts by `system_key`, never by code (schools may renumber codes). `system_key` is unique per organization.
+- `DefaultChartOfAccounts::seedFor($organizationId)` is idempotent (upsert by `(organization_id, system_key)`). It is not wired to organization creation yet.
+
+| code | name | type | system_key | requires_family |
+|---|---|---|---|---|
+| 1000 | Cash in Hand | asset | cash | no |
+| 1010 | Bank | asset | bank | no |
+| 1020 | Gateway Clearing | asset | gateway_clearing | no |
+| 1100 | Fee Receivable | asset | fee_receivable | yes |
+| 2000 | Family Advance Credit | liability | family_credit | yes |
+| 2100 | Refunds Payable | liability | refunds_payable | yes |
+| 2200 | Security Deposits | liability | security_deposits | yes |
+| 2300 | Pass-through Payable | liability | pass_through | no |
+| 3000 | Opening Balance Equity | equity | opening_equity | no |
+| 4000 | Tuition Fee Income | income | tuition_income | no |
+| 4100 | Other Fee Income | income | other_fee_income | no |
+| 4900 | Late Fee Income | income | late_fee_income | no |
+| 5000 | Fee Discounts | expense | fee_discounts | no |
+| 5100 | Fee Waivers | expense | fee_waivers | no |
+| 5200 | Scholarships | expense | scholarships | no |
+
+Per fee head income accounts are created together with the fee heads in 2C-2.
+
+### D-49 Number sequences (gap-free)
+- One row per `(organization, campus, key, fiscal_year)`. `fiscal_year` is the calendar year in which the fiscal year starts. The start month comes from `config('ledger.fiscal_year_start_month')`, default 7 (July, the Pakistan fiscal year). A per-organization setting is a later policy.
+- `NumberSequenceService::next()` is ONE statement: `INSERT ... ON CONFLICT (...) DO UPDATE SET last_number = number_sequences.last_number + 1 RETURNING last_number`. The row lock is held until commit, so the caller takes the number as the LAST step before commit (D-28 contention rule). A rollback gives the number back. Never `max()+1`, never an advisory lock, never Redis.
+- A trigger allows only `+1` steps, forbids deletes and forbids changing the identity columns.
+- Reserved keys: `receipt`, `voucher`. The printed formats (for example `{CAMPUS}-{YYMM}-{SEQ:5}`) belong to the PRD that prints them.
+
+### D-50 Posting service contract (internal, no HTTP)
+- `LedgerPoster::post(PostingRequest): JournalEntry` and `LedgerPoster::reverse(JournalEntry, User $actor, ?CarbonInterface $date, ?string $memo): JournalEntry`. They do not check permissions: the calling domain service has already checked its own permission and SoD. They are never exposed directly over HTTP.
+- `PostingRequest`: organizationId, campusId, entryDate, sourceType, sourceId, createdBy (user id), memo, lines. `PostingLine`: account (by `system_key` or by id), familyId, debitMinor or creditMinor, description.
+- Order inside `post()`: validate in PHP (two or more lines, integers, exactly one side above zero per line, debit total equals credit total, campus and accounts belong to the organization) -> look up an existing entry for `(org, source_type, source_id, kind)` FIRST (a retry after the period closed must still return the old entry) -> same `lines_hash` returns it, a different hash throws `LedgerConflict` -> resolve the period (D-45) and throw `LedgerPeriodClosed` if it is closed -> `INSERT ... ON CONFLICT DO NOTHING RETURNING id` (if nothing was inserted a concurrent request won: reload and compare hashes again) -> insert lines -> force the deferred check.
+- Exceptions: `LedgerValidationException`, `LedgerConflict`, `LedgerPeriodClosed`, `LedgerAccessDenied`. Messages never contain amounts of other tenants, only ids of the caller's own rows.
+- `post()` joins the caller's transaction (nested `DB::transaction`); it never commits on its own outside one.
+
+### D-51 Reports and permissions
+- No new permissions. Period close uses `ledger.period.close`. Reports use `ledger.entry.view`. `ledger.adjustment.post` (manual adjustments) is not built in 2C-1.
+- `LedgerReports::trialBalance(User, orgId, from, to, ScopeContext, ?campusId)` and `LedgerReports::familyBalance(User, orgId, familyId, systemKey, ScopeContext)`. Same pattern as `PiiViewer`: organization check first (super admin excepted), then `AccessResolver::can()`, else `LedgerAccessDenied`. Sums are computed by the database, never by looping over lines in PHP. Reversals are real entries, so they net out in the sums.
+
+### D-52 Golden tests for 2C-1 (from the fees ERD, section 7.2, amounts in paisa)
+- P3 voucher issue: Dr Fee Receivable 6,900,000 + Dr Fee Discounts 1,100,000 = Cr Tuition 7,000,000 + Cr Other Fee Income 1,000,000.
+- P4 payment after the due date: Dr Cash 7,000,000 = Cr Fee Receivable 6,900,000 + Cr Late Fee Income 100,000. The family receivable balance after P3 and P4 is 0.
+- P5 UPDATE or DELETE on a journal entry or line fails at the database.
+- P6 an unbalanced entry never commits (rejected by the poster in PHP, and by the trigger when inserted with raw SQL).
+- P7 reversal: a new mirrored entry, the original untouched, trial balance nets to zero, a second reverse returns the same reversal.
+- P8 security deposit refund 1,000,000: Dr Security Deposits = Cr Cash.
+
