@@ -120,6 +120,123 @@ final class DbFactory
         return $id;
     }
 
+    /** @param array<string, mixed> $over */
+    public static function family(string $org, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('families')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'family_code' => 'F'.substr($id, -8),
+            'display_name' => 'Family '.substr($id, -6),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, mixed> $over */
+    public static function account(string $org, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('accounts')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'code' => substr($id, -8),
+            'name' => 'Account '.substr($id, -6),
+            'type' => 'asset',
+            'system_key' => null,
+            'requires_family' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, mixed> $over */
+    public static function period(string $org, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('ledger_periods')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'name' => '2026-07',
+            'starts_on' => '2026-07-01',
+            'ends_on' => '2026-07-31',
+            'status' => 'open',
+            'closed_at' => null,
+            'closed_by' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, mixed> $over */
+    public static function entry(string $org, string $campus, string $period, string $user, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('journal_entries')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'campus_id' => $campus,
+            'period_id' => $period,
+            'entry_date' => '2026-07-15',
+            'source_type' => 'payment',
+            'source_id' => self::id(),
+            'kind' => 'posting',
+            'reversal_of' => null,
+            'line_count' => 2,
+            'total_minor' => 100000,
+            'lines_hash' => hash('sha256', $id),
+            'memo' => 'Test entry',
+            'created_by' => $user,
+            'created_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, mixed> $over */
+    public static function line(string $org, string $entry, string $account, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('journal_lines')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'entry_id' => $entry,
+            'line_no' => 1,
+            'account_id' => $account,
+            'family_id' => null,
+            'debit_minor' => 100000,
+            'credit_minor' => 0,
+            'description' => 'Test line',
+            'created_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, mixed> $over */
+    public static function sequence(string $org, string $campus, array $over = []): string
+    {
+        $id = self::id();
+        DB::table('number_sequences')->insert($over + [
+            'id' => $id,
+            'organization_id' => $org,
+            'campus_id' => $campus,
+            'key' => 'receipt',
+            'fiscal_year' => 2026,
+            'last_number' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
     /** Runs $fn inside a savepoint so a failed statement does not poison the surrounding test transaction. */
     public static function exception(callable $fn): ?QueryException
     {
