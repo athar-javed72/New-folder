@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\Ledger\FiscalYear;
 use App\Services\Ledger\NumberSequenceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -12,10 +13,10 @@ beforeEach(function () {
 });
 
 it('reads the start month from config when none is given', function () {
-    expect(App\Services\Ledger\FiscalYear::startYearFor(Carbon::create(2026, 6, 30)))->toBe(2025);
+    expect(FiscalYear::startYearFor(Carbon::create(2026, 6, 30)))->toBe(2025);
 
     config(['ledger.fiscal_year_start_month' => 13]);
-    expect(fn () => App\Services\Ledger\FiscalYear::startYearFor(Carbon::create(2026, 6, 30)))
+    expect(fn () => FiscalYear::startYearFor(Carbon::create(2026, 6, 30)))
         ->toThrow(InvalidArgumentException::class, 'Invalid fiscal year start month.');
 });
 

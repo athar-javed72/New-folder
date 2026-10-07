@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
-/** Organization-wide ledger period (D-45). A closed period is final (database trigger). */
+/**
+ * Organization-wide ledger period (D-45). A closed period is final (database trigger).
+ *
+ * @property Carbon|null $closed_at
+ */
 class LedgerPeriod extends Model
 {
     use HasUlids;
