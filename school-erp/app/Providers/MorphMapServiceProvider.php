@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\Account;
 use App\Models\Campus;
 use App\Models\ContractType;
 use App\Models\Employee;
 use App\Models\EmploymentContract;
 use App\Models\Grade;
 use App\Models\Guardian;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
+use App\Models\LedgerPeriod;
 use App\Models\Organization;
 use App\Models\Program;
 use App\Models\Student;
@@ -40,6 +44,10 @@ class MorphMapServiceProvider extends ServiceProvider
             'student_medical_profile' => StudentMedicalProfile::class,
             'student_custody_order' => StudentCustodyOrder::class,
             'user' => User::class,
+            'account' => Account::class,
+            'ledger_period' => LedgerPeriod::class,
+            'journal_entry' => JournalEntry::class,
+            'journal_line' => JournalLine::class,
         ]);
     }
 }
