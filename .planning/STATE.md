@@ -1,6 +1,6 @@
 # STATE
 
-Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€” **COMPLETED**
+Phase 1 (Step 1), Phase 2A (Access Module), Phase 2B (Privacy & Encryption), & Phase 2C-1 (Ledger Core) â€” **COMPLETED**
 
 ---
 
@@ -64,6 +64,26 @@ Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€
   - `PiiViewer`: Controlled decryptor enforcing organization tenancy check before `AccessResolver::can()` checks (`students.ids.view`, `hr.employee.view`, `pastoral.medical.view`, `pastoral.safeguarding.view`). Atomically writes exactly one `audit_logs` row (`action = 'pii.viewed'`, morph alias, meta `['field_group' => ...]`) alongside value revelation inside a database transaction.
   - `StudentMedicalService`: Atomic upsert of `StudentMedicalProfile`, updating `students` flags (`has_medical_alert`, `has_severe_allergy`) with tenancy scoping, and recording `audit_logs` (`action = 'pii.updated'`, meta `['field_group' => 'medical']`). Enforces `pastoral.medical.edit` permission and organizational tenancy.
 
+### Ledger Core Module (Phase 2C-1)
+- **Tables (5 core tables):**
+  - `accounts`: Chart of accounts with type (`asset`, `liability`, `income`, `expense`, `equity`), unique `(organization_id, system_key)`, `requires_family`, and guard trigger blocking type mutation once lines exist.
+  - `ledger_periods`: Date ranges per organization with GiST non-overlap exclusion constraint, auto-created calendar months, and guard trigger preventing reopen or date alteration once entries exist.
+  - `journal_entries`: Append-only entries with ULID keys, unique `(organization_id, source_type, source_id, kind)`, `kind IN ('posting', 'reversal')`, `reversal_of`, shape declarations (`line_count`, `total_minor`), and `lines_hash` (SHA-256 canonical hash). Checked via deferred balance constraints at commit.
+  - `journal_lines`: Double-entry lines with `debit_minor` / `credit_minor` paisa checks (exactly one side > 0), unique `(entry_id, line_no)`, composite FKs, and family sub-ledger enforcement.
+  - `number_sequences`: Gap-free sequential numbering per `(organization_id, campus_id, key, fiscal_year)` via atomic upsert with row locks held until commit; trigger blocks decrements, jumps, and deletes.
+- **Services (`app/Services/Ledger/`):**
+  - `DefaultChartOfAccounts`: Idempotent seeding of 15 standard D-48 accounts via `seedFor(string $organizationId)`.
+  - `FiscalYear`: `startYearFor(CarbonInterface $date, ?int $startMonth = null)` resolving fiscal start years based on configurable start month (default 7).
+  - `NumberSequenceService`: `next(string $organizationId, string $campusId, string $key, CarbonInterface $date)` atomic sequence generation.
+  - `LedgerPeriodService`: `forDate(string $organizationId, CarbonInterface $date)` period resolution/creation and `close(User $actor, LedgerPeriod $period, ScopeContext $scope)` audit-logged closing with concurrency locks.
+  - `LedgerPoster`: Internal append-only poster (`post(PostingRequest)`, `reverse(JournalEntry, User, ?CarbonInterface, ?string)`) with PHP pre-validation, canonical line hashing, idempotent replay, raw SQL insertion with conflict handling, mirrored reversal line construction, and immediate deferred constraint checks.
+  - `LedgerReports`: Internal reporting service (`trialBalance`, `familyBalance`) with DB-level SQL aggregation, tenancy and permission authorization, and strict scope coverage checks.
+- **Exceptions (`app/Services/Ledger/`):**
+  - `LedgerAccessDenied`: RuntimeException with generic `"Not allowed."` message.
+  - `LedgerValidationException`: Validation exceptions with specific reason codes.
+  - `LedgerConflict`: Thrown on concurrent posting with conflicting lines hash.
+  - `LedgerPeriodClosed`: Thrown when posting into a closed period.
+
 ### Security, Throttling & Key Runbook
 - **Password Hashing:** `config/hashing.php` configured with `env('HASH_DRIVER', 'argon2id')` (memory: 65536, time: 4, threads: 1).
 - **Login Rate Limiter:** Named rate limiter `login` registered in `AppServiceProvider::boot()` with 5 attempts per minute keyed by `strtolower(trim($email)) . '|' . $ip`.
@@ -72,43 +92,33 @@ Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€
 ### Core Eloquent Models & Morph Map
 - **Access Models:** `Permission`, `Role`, `RolePermission`, `RoleAssignment`, `PermissionGrant`, `DelegationBoundary`, `SodRule`.
 - **Privacy Models:** `StudentMedicalProfile`, `StudentCustodyOrder`.
+- **Ledger Models:** `Account`, `LedgerPeriod`, `JournalEntry`, `JournalLine`, `NumberSequence` (all with ULIDs, strict casting, immutable triggers, no updated_at on entries/lines).
 - **Domain & System Models:** `User`, `Organization`, `Campus`, `AcademicCalendar`, `Grade`, `Family`, `Student`, `Guardian`, `Employee`, `Enrollment`, `SystemPolicy`, `PolicyOverride`, `LeaveLedger`, `AuditLog`, `Preset`.
 - **Encrypted Columns & Scopes:**
   - `Student`, `Guardian`, `Employee`: Encrypted casts on ciphertext columns, `$guarded` protecting ciphertext and hash columns against mass-assignment, `$hidden` preventing exposure in arrays/JSON (D-36), atomic helpers (`setBForm`, `setPassport`, `setNationalId`), and blind index lookup query scopes (`whereBForm`, `wherePassport`, `whereNationalId`).
   - `StudentMedicalProfile`: Encrypted `allergies`, `conditions`, `medications`, `doctor_notes`, `$hidden`.
   - `StudentCustodyOrder`: Encrypted `details`, `$hidden`.
-- **Morph Aliases:** Explicitly mapped in `MorphMapServiceProvider` (`student`, `guardian`, `employee`, `student_medical_profile`, `student_custody_order`, `user`, etc.).
+- **Morph Aliases:** Explicitly mapped in `MorphMapServiceProvider` (`student`, `guardian`, `employee`, `student_medical_profile`, `student_custody_order`, `user`, `account`, `ledger_period`, `journal_entry`, `journal_line`).
 
 ---
 
 ## 2. What Passed
 
 ### Test Suite (`./vendor/bin/pest`)
-- **Total Tests:** 187 passed (1190 assertions).
-- **Unit Tests (60 tests):**
-  - `AccessMatrixTest` (8 tests): Matrix invariants, code format, unique codes, scope types, no sensitive with_grant, SoD rules validation, 13 role keys, principal grant scope restrictions.
-  - `BlindIndexTest` (12 tests): Dash/space stripping, case normalization, cross-tenant isolation, key sensitivity, output length, empty/null handling, key length enforcement without leaks.
-  - `ContractPayrollCalculatorTest` (8 tests): Golden numbers and session calculation rules.
-  - `GpaCalculatorTest` (7 tests): Golden numbers, GPA calculation methods, rounding.
-  - `LateFeeCalculatorTest` (10 tests): Golden numbers, grace days, working day shift, caps.
-  - `PolicyResolverTest` (7 tests): Hierarchy cascade, specificity, deep merge, date validity.
-  - `PresetMapperTest` (7 tests): 17 policies, SHA-256 stability, JSON object preservation.
-  - `ExampleTest` (1 test).
-- **Feature & Constraint Tests (127 tests):**
-  - `PrivacyConstraintsTest` (17 tests): Dropped `medical` column verification, default flags, column-free inserts, duplicate and cross-tenant `b_form_hash` / `passport_hash`, soft-delete hash release, malformed hash check constraints, guardian and employee duplicate hash allowances, single medical profile constraint, cross-tenant composite FK rejection.
-  - `EncryptedModelsTest` (10 tests): Ciphertext verification, round-trip decryption, formatted lookups, cross-org denial, empty lookup denial, serialization hiding, clearing, LogicException on missing org, mass-assignment ignoring, model relations.
-  - `PiiViewerTest` (13 tests): Controlled access across all 5 methods, audit logging verification, permission denial, cross-tenant denial, campus-scoped isolation, exception message safety, transactional abort on audit failure, null-scope fail-closed assertion.
-  - `StudentMedicalServiceTest` (11 tests): Profile creation and flag management, clearing flags, severe allergy argument tracking, permission/cross-tenant denial, upsert uniqueness (single row), meta privacy, ciphertext verification, doctor_notes isolation from alert flag, unknown key ignoring, transactional rollback on audit write failure.
-  - `AccessResolverTest` (10 tests): Campus isolation, expired/suspended assignments, section isolation, super admin bypass, cross-org denial, module enablement overrides, ceiling enforcement, direct grants, derived campus module enablement and rejection of unresolvable scopes (D-41).
-  - `DelegationServiceTest` (14 tests): Campus admin delegation, cross-campus denial, sensitive grant denial, org_admin sensitive grant, principal fees denial, cross-org denial, cascade revoke with audit logs, delegation boundaries max_scope cap, direct canGrant verification, unauthorized revoke denial, parent grant lifetime capping and no self-delegation (D-37, D-38), SELECT FOR UPDATE row locking and stale model handling (D-39), system role enforcement for org_admin (D-40), scope ID existence validation across tables (D-42).
-  - `SodGuardTest` (15 tests): Same-record dual action blocking, distinct actor allowance, distinct record allowance, data-driven tests across all 6 seeded system SoD pairs in both directions, org-specific rules, inactive rule handling, multi-tenant isolation, same permission repeated allowance, super admin enforcement, super admin with null organization with/without organizationId parameter (D-43).
-  - `SodRulesConstraintTest` (4 tests): System & org rule inserts, reversed pair rejection (`permission_a >= permission_b`), duplicate system rule rejection, different record_type allowance.
-  - `AccessSeederTest` (3 tests): Exact seed counts (62 permissions, 14 system roles, 6 SoD rules), idempotency across re-runs, sensitive grant constraints.
-  - `HashingAndThrottlingTest` (7 tests): Rate limiter key generation, normalization, fallback, 5-attempt limit per minute, Argon2id hashing and verification.
-  - `DatabaseConstraintsTest` (18 tests): Multi-tenancy composite FKs, single active enrollment, mandatory end_date, user organization requirements, append-only ledgers and audit logs, contract GiST exclusion constraints, policy override GiST exclusion constraints, outbox deduplication.
-  - `PresetSeederTest` (3 tests): First import creates 17 policies, rerun creates 0, modified content triggers `PresetChecksumMismatch`.
-  - `EloquentIntegrationTest` (1 test): Creation and reloading of core models through Eloquent.
-  - `ExampleTest` (1 test).
+- **Total Tests:** 301 passed (1714 assertions).
+- **Ledger Core Tests (114 tests):**
+  - `LedgerConstraintsTest` (21 tests): Balanced entry acceptance, unbalanced entry trigger rejection, zero lines rejection, line count mismatch rejection, total minor mismatch rejection, post-commit line addition rejection, immutability of entries and lines, invalid debit/credit combinations rejection, family requirement enforcement, inactive account rejection, cross-tenant isolation, period date boundaries, closed period immutability and reopen prevention, exclusion constraint on overlapping periods, unique source duplicate rejection, comprehensive reversal rules, account type mutation prevention, unique system_key per organization, number sequence advance rules.
+  - `DefaultChartOfAccountsTest` (7 tests): Idempotent seeding of 15 accounts with types and requires_family flags, type preservation on re-run, separate sets across organizations, system_key uniqueness and scope queries.
+  - `LedgerModelsTest` (8 tests): Model ULID creation, relations, casts, append-only exception throwing on update/delete for JournalEntry and JournalLine, and delete prevention on NumberSequence.
+  - `FiscalYearTest` (4 tests): Fiscal year start calculations for July and January starts, config default handling, invalid month rejection.
+  - `NumberSequenceServiceTest` (12 tests): Sequential number generation (1, 2, 3), independence per campus/key/fiscal year, cross-org campus rejection, rollback number recovery, invalid key validation.
+  - `LedgerPeriodServiceTest` (13 tests): Month period auto-creation and reuse, boundary date handling, closed period retrieval, cross-org isolation, closing with permission, permission/cross-org denial, single audit log row, DB reopen prevention.
+  - `LedgerPosterTest` (23 tests): P3 voucher issue and P4 payment postings, idempotency on re-post, conflict on changed lines, hash invariance to line order/date/memo, retry in closed periods, closed period first-post rejection, missing period auto-creation, PHP pre-validation datasets (unbalanced, both sides, zero amount, single line, floats, strings, inactive account, foreign account, foreign campus, missing family, foreign family, invalid source, long memo, overflow).
+  - `LedgerReversalTest` (12 tests): Mirrored lines and swapped sides, original byte-identical preservation, idempotent second reverse, lines_hash divergence, reversal of reversal rejection, date before original rejection, long memo rejection, auto-created period on closed original, closed reversal period rejection, cross-org actor denial, super admin reversal, SQL trial balance netting to zero, null date today default.
+  - `LedgerGoldenTest` (6 tests): P3 voucher issue trial balance, P4 payment netting family balance to 0, P5 append-only update/delete query exceptions, P6 unbalanced entry rejections via PHP and DB trigger, P7 reversal netting trial balance to zero, P8 security deposit refund with credit-normal negative balance.
+  - `LedgerReportsTest` (8 tests): Trial balance debit equals credit, zero rows for inactive accounts, inclusive date range filtering, campus filtering, invalid input exceptions, permission and scope denial scenarios with exact message "Not allowed.", super admin access, multi-tenant data isolation.
+- **Access, Privacy & Domain Tests (187 tests):**
+  - All existing unit, feature, and constraint tests continue to pass with 100% green status.
 
 ### Seed Idempotency & Database Row Counts
 - Verified via `php artisan migrate:fresh --seed` (run twice):
@@ -117,38 +127,47 @@ Phase 1 (Step 1), Phase 2A (Access Module), & Phase 2B (Privacy & Encryption) â€
   - `role_permissions`: 219
   - `sod_rules`: 6
   - `system_policies`: 17
-- Verified database schema:
-  - `student_medical_profiles` table exists.
-  - `student_custody_orders` table exists.
-  - `students` table contains `b_form_encrypted`, `b_form_hash`, `passport_encrypted`, `passport_hash`, `has_medical_alert`, `has_severe_allergy`.
+  - `accounts`: 0
+  - `ledger_periods`: 0
+  - `journal_entries`: 0
+  - `journal_lines`: 0
+  - `number_sequences`: 0
 
 ### Static Analysis, Linting & Style Gates
 - **PHP Syntax:** All PHP files under `app/`, `database/`, and `tests/` linted cleanly (`php -l`).
 - **Laravel Pint:** Passed with 0 violations (`pint --test`).
-- **Larastan (Level 5):** Passed with 0 errors across 54 files analysed in `app/`.
+- **Larastan (Level 5):** Passed with 0 errors across 71 files analysed in `app/`.
 
 ---
 
 ## 3. Consolidated Known Gaps
 
-The following consolidated known gaps remain out of scope for Phase 2B:
-1. **`BLIND_INDEX_KEY` rotation command not built:** Key rotation requires an offline, batch-recomputing command per organization with count and unique index verification; currently unsupported until built.
-2. **Re-encrypt command not built (D-31):** Key rotation for `APP_KEY` decrypts old rows via `APP_PREVIOUS_KEYS`, but old rows stay encrypted with the previous key until rewritten; `APP_PREVIOUS_KEYS` must stay until a full re-encrypt command exists and is executed.
-3. **Counselling and safeguarding tables are later phases:** Custody orders have a model and viewer (`PiiViewer::custody`), but no dedicated writer service or workflow engine yet.
-4. **No HTTP layer yet:** When built, `ScopeContext` must be derived from the record's own campus, never from user-supplied request input.
-5. **`PiiViewer` scope parameter is nullable:** Passing `null` fails closed (denied and tested for campus-scoped roles); consider making it strictly required when the HTTP layer is built.
-6. **Self-scope resolution for parent/student deferred (from 2A):** Dynamic resolution of `self` scope is deferred pending student/parent authentication and guardian-user relationship linking.
-7. **Role-assignment delegation not built (from 2A):** Delegating entire role assignments (`access.role.assign`) is not built (only single permission grants via `DelegationService::grant`).
-8. **`delegation_boundaries.requires_approval` ignored (from 2A):** Bypassed pending multi-step workflow approval engine.
-9. **Audit row writing by feature modules (from 2A):** `SodGuard` is read-only. Feature modules must write the audit row named after the permission code upon executing an action and must invoke `SodGuard::assertAllowed()` prior to acting.
-10. **No per-IP aggregate login cap (from 2A):** Rate limiting is enforced per `email + IP` (5/min). An aggregate per-IP cap is deferred to be decided together with public API contracts.
-11. **grants made through a role assignment are not capped by the assignment's end date**
-12. **can() runs several queries per call, list endpoints must filter by scope in the query, never call can() per row**
-13. **SoD plus action are not yet atomic, to be solved in Phase 2C (record row lock and ActionGate)**
+The following consolidated known gaps remain for Phase 2C-1:
+1. **no vouchers, payments or fee tables yet (2C-2 to 2C-4)**
+2. **DefaultChartOfAccounts is not wired to organization creation**
+3. **manual adjustments (ledger.adjustment.post) not built**
+4. **custom period ranges not built**
+5. **ledger reports have no HTTP layer**
+6. **familyBalance and organization-wide trial balance require an organization-wide scope (campus-scoped variants not built)**
+7. **LedgerPoster is internal and must never be called from a controller directly**
+8. **the config value fiscal_year_start_month is global, not per organization**
+9. **`BLIND_INDEX_KEY` rotation command not built:** Key rotation requires an offline, batch-recomputing command per organization with count and unique index verification; currently unsupported until built.
+10. **Re-encrypt command not built (D-31):** Key rotation for `APP_KEY` decrypts old rows via `APP_PREVIOUS_KEYS`, but old rows stay encrypted with the previous key until rewritten; `APP_PREVIOUS_KEYS` must stay until a full re-encrypt command exists and is executed.
+11. **Counselling and safeguarding tables are later phases:** Custody orders have a model and viewer (`PiiViewer::custody`), but no dedicated writer service or workflow engine yet.
+12. **No HTTP layer yet for privacy:** When built, `ScopeContext` must be derived from the record's own campus, never from user-supplied request input.
+13. **`PiiViewer` scope parameter is nullable:** Passing `null` fails closed (denied and tested for campus-scoped roles); consider making it strictly required when the HTTP layer is built.
+14. **Self-scope resolution for parent/student deferred (from 2A):** Dynamic resolution of `self` scope is deferred pending student/parent authentication and guardian-user relationship linking.
+15. **Role-assignment delegation not built (from 2A):** Delegating entire role assignments (`access.role.assign`) is not built (only single permission grants via `DelegationService::grant`).
+16. **`delegation_boundaries.requires_approval` ignored (from 2A):** Bypassed pending multi-step workflow approval engine.
+17. **Audit row writing by feature modules (from 2A):** `SodGuard` is read-only. Feature modules must write the audit row named after the permission code upon executing an action and must invoke `SodGuard::assertAllowed()` prior to acting.
+18. **No per-IP aggregate login cap (from 2A):** Rate limiting is enforced per `email + IP` (5/min). An aggregate per-IP cap is deferred to be decided together with public API contracts.
+19. **grants made through a role assignment are not capped by the assignment's end date**
+20. **can() runs several queries per call, list endpoints must filter by scope in the query, never call can() per row**
+21. **SoD plus action are not yet atomic, to be solved in Phase 2C (record row lock and ActionGate)**
 
 ---
 
 ## 4. Next Phase
 
-Phase 2B (Privacy & Encryption) is complete. Do **NOT** start Phase 2C until a new `PRD.md` is provided.
+Phase 2C-1 (Ledger Core) is complete. Do **NOT** start Phase 2C-2 until a new PRD is provided.
 
