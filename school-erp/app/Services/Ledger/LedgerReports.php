@@ -14,9 +14,6 @@ use Illuminate\Support\Facades\DB;
  * Ledger reporting service (D-51).
  *
  * All aggregations happen in the database; no line-looping in PHP.
- *
- * @method static array trialBalance(User $actor, string $organizationId, CarbonInterface $from, CarbonInterface $to, ScopeContext $scope, ?string $campusId = null)
- * @method static int familyBalance(User $actor, string $organizationId, string $familyId, string $systemKey, ScopeContext $scope)
  */
 final class LedgerReports
 {
@@ -256,15 +253,5 @@ final class LedgerReports
         $isDebitNormal = in_array($account->type, ['asset', 'expense'], true);
 
         return $isDebitNormal ? ($debit - $credit) : ($credit - $debit);
-    }
-
-    /**
-     * Allows static calls like LedgerReports::trialBalance(...) or LedgerReports::familyBalance(...).
-     *
-     * @param  array<int, mixed>  $arguments
-     */
-    public static function __callStatic(string $method, array $arguments): mixed
-    {
-        return (new self)->$method(...$arguments);
     }
 }

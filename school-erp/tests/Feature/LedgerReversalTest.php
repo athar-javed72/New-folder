@@ -303,12 +303,18 @@ it('nets trial balance per account to zero over both original and reversal entri
 });
 
 it('defaults to today when date is null and succeeds when today is on or after original date', function () {
-    $f = reversalFixture();
-    // Post original dated today
-    $today = CarbonImmutable::today();
-    $original = createOriginalEntry($f, Carbon::instance($today));
+    CarbonImmutable::setTestNow('2026-10-08 12:00:00');
+    Carbon::setTestNow('2026-10-08 12:00:00');
 
-    $reversal = $f['poster']->reverse($original, $f['actor']);
+    try {
+        $f = reversalFixture();
+        $original = createOriginalEntry($f, Carbon::parse('2026-10-08'));
 
-    expect($reversal->entry_date->toDateString())->toBe($today->toDateString());
+        $reversal = $f['poster']->reverse($original, $f['actor']);
+
+        expect($reversal->entry_date->toDateString())->toBe('2026-10-08');
+    } finally {
+        CarbonImmutable::setTestNow(null);
+        Carbon::setTestNow(null);
+    }
 });

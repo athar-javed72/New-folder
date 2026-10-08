@@ -53,7 +53,7 @@ function reportsFixture(): array
     $family = F::family($org);
     DefaultChartOfAccounts::seedFor($org);
     $poster = new LedgerPoster;
-    $reports = new LedgerReports;
+    $reports = app(LedgerReports::class);
     $scope = new ScopeContext(organizationId: $org);
 
     return compact('org', 'campus', 'actor', 'family', 'poster', 'reports', 'scope');

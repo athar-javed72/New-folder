@@ -88,7 +88,7 @@ test('P3 voucher issue: Dr fee_receivable + Dr fee_discounts = Cr tuition_income
         ->and($entry->total_minor)->toBe(8_000_000);
 
     // Retrieve trial balance
-    $reports = new LedgerReports;
+    $reports = app(LedgerReports::class);
     $tb = $reports->trialBalance($f['actor'], $f['org'], Carbon::create(2026, 8, 1), Carbon::create(2026, 8, 31), $f['scope']);
 
     $byKey = collect($tb)->keyBy('system_key');
@@ -116,7 +116,7 @@ test('P3 voucher issue: Dr fee_receivable + Dr fee_discounts = Cr tuition_income
 
 test('P4 payment after due date: Dr cash = Cr fee_receivable + Cr late_fee_income, netting family balance to 0', function () {
     $f = goldenFixture();
-    $reports = new LedgerReports;
+    $reports = app(LedgerReports::class);
 
     // 1. Post P3 voucher issue
     $f['poster']->post(new PostingRequest(
@@ -303,7 +303,7 @@ test('P6 unbalanced entry is rejected by poster in PHP and by trigger in raw SQL
 
 test('P7 reversal: original untouched, idempotent second call, trial balance nets to zero', function () {
     $f = goldenFixture();
-    $reports = new LedgerReports;
+    $reports = app(LedgerReports::class);
 
     $original = $f['poster']->post(new PostingRequest(
         organizationId: $f['org'],
@@ -347,7 +347,7 @@ test('P7 reversal: original untouched, idempotent second call, trial balance net
 
 test('P8 security deposit refund 1,000,000: Dr security_deposits = Cr cash, family balance is -1,000,000', function () {
     $f = goldenFixture();
-    $reports = new LedgerReports;
+    $reports = app(LedgerReports::class);
 
     $f['poster']->post(new PostingRequest(
         organizationId: $f['org'],
