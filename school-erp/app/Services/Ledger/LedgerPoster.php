@@ -88,6 +88,10 @@ final class LedgerPoster
 
             $userOk = DB::table('users')
                 ->where('id', $request->createdBy)
+                ->where(function ($q) use ($request) {
+                    $q->where('organization_id', $request->organizationId)
+                        ->orWhereNull('organization_id');
+                })
                 ->exists();
             if (! $userOk) {
                 throw new LedgerValidationException('unknown_user');
@@ -276,9 +280,7 @@ final class LedgerPoster
             // -------------------------------------------------------------
             // Step a: Organization check (actor vs original)
             // -------------------------------------------------------------
-            if ($actor->organization_id !== null && (string) $actor->organization_id !== (string) $original->organization_id) {
-                throw new LedgerAccessDenied;
-            }
+            LedgerTenancy::assertActorInOrganization($actor, (string) $original->organization_id);
 
             // -------------------------------------------------------------
             // Step b: Reload the original with organization_id and id filters

@@ -63,7 +63,8 @@ it('changes nothing on a second run: same ids, same rows, same count', function 
         ->and($after)->toBe($before);
 });
 
-it('never changes the type of an existing account and restores its D-48 name', function () {
+it('never changes the type, name or code of an existing account on re-seed', function () {
+    // Deliberate decision change (D-48): schools may renumber/rename; re-run must leave them alone.
     $org = F::org();
     $existing = F::account($org, ['code' => '1000', 'name' => 'Old Test Name', 'type' => 'liability', 'system_key' => 'cash']);
 
@@ -71,9 +72,35 @@ it('never changes the type of an existing account and restores its D-48 name', f
 
     $row = DB::table('accounts')->where('id', $existing)->first();
     expect($row->type)->toBe('liability')
-        ->and($row->name)->toBe('Cash in Hand')
+        ->and($row->name)->toBe('Old Test Name')
+        ->and($row->code)->toBe('1000')
         ->and(DB::table('accounts')->where('organization_id', $org)->count())->toBe(15)
         ->and(DB::table('accounts')->where('organization_id', $org)->where('system_key', 'cash')->count())->toBe(1);
+});
+
+it('leaves a customized cash account name and code alone on a second seedFor', function () {
+    $org = F::org();
+    DefaultChartOfAccounts::seedFor($org);
+
+    $cash = DB::table('accounts')
+        ->where('organization_id', $org)
+        ->where('system_key', 'cash')
+        ->first();
+    $cashId = $cash->id;
+
+    DB::table('accounts')->where('id', $cashId)->update([
+        'name' => 'Custom Cash',
+        'code' => '1999',
+        'updated_at' => now(),
+    ]);
+
+    DefaultChartOfAccounts::seedFor($org);
+
+    $row = DB::table('accounts')->where('id', $cashId)->first();
+    expect($row->name)->toBe('Custom Cash')
+        ->and($row->code)->toBe('1999')
+        ->and($row->id)->toBe($cashId)
+        ->and(DB::table('accounts')->where('organization_id', $org)->count())->toBe(15);
 });
 
 it('gives two organizations separate account sets', function () {

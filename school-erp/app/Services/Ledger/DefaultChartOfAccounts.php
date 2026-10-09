@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Default chart of accounts (D-48). Idempotent: upsert by (organization_id, system_key).
+ * Default chart of accounts (D-48). Idempotent: insert by (organization_id, system_key).
  * Not wired to organization creation or to any seeder yet (known gap).
  */
 final class DefaultChartOfAccounts
@@ -34,8 +34,8 @@ final class DefaultChartOfAccounts
 
     /**
      * One statement. The conflict target repeats the partial-index predicate so PostgreSQL can match
-     * accounts_system_key_uq. On conflict only name and code are refreshed (and only when they differ);
-     * type, requires_family, is_active and id of an existing account are never changed.
+     * accounts_system_key_uq. Existing accounts are never changed. A code that collides with another
+     * account of the same organization fails loudly (unique violation); do not swallow it.
      */
     public static function seedFor(string $organizationId): void
     {
@@ -58,9 +58,7 @@ final class DefaultChartOfAccounts
         DB::statement(
             'INSERT INTO accounts (id, organization_id, code, name, type, system_key, requires_family, is_active, created_at, updated_at) VALUES '
             .implode(', ', $rows)
-            .' ON CONFLICT (organization_id, system_key) WHERE system_key IS NOT NULL DO UPDATE'
-            .' SET name = EXCLUDED.name, code = EXCLUDED.code, updated_at = now()'
-            .' WHERE accounts.name IS DISTINCT FROM EXCLUDED.name OR accounts.code IS DISTINCT FROM EXCLUDED.code',
+            .' ON CONFLICT (organization_id, system_key) WHERE system_key IS NOT NULL DO NOTHING',
             $bindings,
         );
     }

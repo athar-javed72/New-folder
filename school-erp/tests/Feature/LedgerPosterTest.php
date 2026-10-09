@@ -478,3 +478,65 @@ it('posts P4 shape fine', function () {
     expect($entry->total_minor)->toBe(7_000_000)
         ->and($entry->line_count)->toBe(3);
 });
+
+it('rejects createdBy from another organization as unknown_user and writes nothing', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+    $foreignUser = F::user(F::org());
+
+    $entriesBefore = JournalEntry::query()->count();
+    $linesBefore = JournalLine::query()->count();
+
+    try {
+        $poster->post(new PostingRequest(
+            organizationId: $t['org'],
+            campusId: $t['campus'],
+            entryDate: Carbon::create(2026, 8, 1),
+            sourceType: 'payment',
+            sourceId: F::id(),
+            createdBy: $foreignUser,
+            memo: null,
+            lines: [
+                PostingLine::debit('cash', 10_000),
+                PostingLine::credit('tuition_income', 10_000),
+            ],
+        ));
+        test()->fail('Expected LedgerValidationException with reason unknown_user but none was thrown.');
+    } catch (LedgerValidationException $e) {
+        expect($e->reason)->toBe('unknown_user');
+    }
+
+    expect(JournalEntry::query()->count())->toBe($entriesBefore)
+        ->and(JournalLine::query()->count())->toBe($linesBefore);
+});
+
+it('accepts a super admin with null organization_id as createdBy', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+
+    $superAdminId = F::id();
+    DB::table('users')->insert([
+        'id' => $superAdminId,
+        'organization_id' => null,
+        'name' => 'Super Administrator',
+        'email' => strtolower($superAdminId).'@example.test',
+        'is_super_admin' => true,
+    ]);
+
+    $entry = $poster->post(new PostingRequest(
+        organizationId: $t['org'],
+        campusId: $t['campus'],
+        entryDate: Carbon::create(2026, 8, 1),
+        sourceType: 'payment',
+        sourceId: F::id(),
+        createdBy: $superAdminId,
+        memo: null,
+        lines: [
+            PostingLine::debit('cash', 10_000),
+            PostingLine::credit('tuition_income', 10_000),
+        ],
+    ));
+
+    expect($entry)->toBeInstanceOf(JournalEntry::class)
+        ->and($entry->created_by)->toBe($superAdminId);
+});

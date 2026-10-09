@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use LogicException;
 
 /** Gap-free document numbers per (organization, campus, key, fiscal year) (D-49). */
 final class NumberSequenceService
@@ -15,12 +16,19 @@ final class NumberSequenceService
     /**
      * Takes the next number with ONE statement (insert-or-increment, RETURNING last_number).
      *
+     * Must be called inside a database transaction (transactionLevel >= 1); otherwise throws
+     * LogicException so a failed document cannot leave a gap.
+     *
      * Call this LAST, right before commit, so the row lock is held for the shortest time.
      * Never call it outside a transaction that also posts the document that uses the number:
      * a rollback gives the number back, which is what keeps the sequence gap-free.
      */
     public function next(string $organizationId, string $campusId, string $key, CarbonInterface $date): int
     {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Number sequences must be taken inside a transaction.');
+        }
+
         if (preg_match('/^[a-z_]{1,40}$/', $key) !== 1) {
             throw new InvalidArgumentException('Invalid sequence key.');
         }

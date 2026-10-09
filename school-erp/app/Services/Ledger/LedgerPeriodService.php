@@ -64,9 +64,7 @@ final class LedgerPeriodService
     {
         $organizationId = (string) $period->organization_id;
 
-        if (! $actor->is_super_admin && ($actor->organization_id === null || (string) $actor->organization_id !== $organizationId)) {
-            throw new LedgerAccessDenied;
-        }
+        LedgerTenancy::assertActorInOrganization($actor, $organizationId);
 
         if (! AccessResolver::can($actor, 'ledger.period.close', $scope)) {
             throw new LedgerAccessDenied;

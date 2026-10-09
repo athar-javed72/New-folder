@@ -45,10 +45,8 @@ final class LedgerReports
         // -----------------------------------------------------------------
         // Access checks (Item 2)
         // -----------------------------------------------------------------
-        // (a) Organization check: actor's organization must match, unless super admin with null org
-        if ($actor->organization_id !== null && (string) $actor->organization_id !== $organizationId) {
-            throw new LedgerAccessDenied;
-        }
+        // (a) Organization check: actor's organization must match, unless super admin
+        LedgerTenancy::assertActorInOrganization($actor, $organizationId);
 
         // (b) Permission check: actor must hold ledger.entry.view in the given scope
         if (! AccessResolver::can($actor, 'ledger.entry.view', $scope)) {
@@ -183,9 +181,7 @@ final class LedgerReports
         // Access checks (Item 2)
         // -----------------------------------------------------------------
         // (a) Organization check
-        if ($actor->organization_id !== null && (string) $actor->organization_id !== $organizationId) {
-            throw new LedgerAccessDenied;
-        }
+        LedgerTenancy::assertActorInOrganization($actor, $organizationId);
 
         // (b) Permission check
         if (! AccessResolver::can($actor, 'ledger.entry.view', $scope)) {
