@@ -82,7 +82,7 @@ it('allows authorized user to view student identifiers and records an audit log'
     $student->setPassport('PK0000001');
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $result = $viewer->studentIds($actor, $student);
 
     expect($result)->toBe([
@@ -116,7 +116,7 @@ it('allows authorized user to view guardian national identifier and records an a
     $guardian->setNationalId('00000-0000002-2');
     $guardian->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $result = $viewer->guardianNationalId($actor, $guardian);
 
     expect($result)->toBe('00000-0000002-2');
@@ -146,7 +146,7 @@ it('allows authorized user to view employee national identifier and records an a
     $employee->setNationalId('00000-0000003-3');
     $employee->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $result = $viewer->employeeNationalId($actor, $employee);
 
     expect($result)->toBe('00000-0000003-3');
@@ -186,7 +186,7 @@ it('allows authorized user to view student medical profile and records an audit 
     $profile->doctor_notes = 'Carry inhaler in backpack';
     $profile->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $result = $viewer->medical($actor, $profile);
 
     expect($result)->toBe([
@@ -228,7 +228,7 @@ it('allows authorized user to view student custody order and records an audit lo
     $order->details = 'Sole legal custody granted to mother';
     $order->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $result = $viewer->custody($actor, $order);
 
     expect($result)->toBe('Sole legal custody granted to mother');
@@ -258,7 +258,7 @@ it('denies user without permission and writes zero audit rows', function () {
     $student->setBForm('00000-0000004-4');
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     expect(fn () => $viewer->studentIds($actor, $student))
         ->toThrow(PiiAccessDenied::class);
@@ -283,7 +283,7 @@ it('denies user from another organization and writes zero audit rows', function 
     $studentInOrgA->setBForm('00000-0000005-5');
     $studentInOrgA->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     expect(fn () => $viewer->studentIds($actorFromOrgB, $studentInOrgA))
         ->toThrow(PiiAccessDenied::class);
@@ -310,7 +310,7 @@ it('ensures audit log meta contains only field group and never plain values', fu
     $student->setPassport($fakePassport);
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $viewer->studentIds($actor, $student);
 
     /** @var AuditLog $audit */
@@ -342,7 +342,7 @@ it('denies campus-scoped permission holder when accessing record for another cam
     $student->setBForm('00000-0000007-7');
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     // Scope context for Campus B
     $scopeForCampusB = new ScopeContext(organizationId: $orgId, campusId: $campusB);
@@ -370,7 +370,7 @@ it('allows campus-scoped permission holder when accessing record for matching ca
     $student->setBForm('00000-0000008-8');
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
     $scopeForCampusA = new ScopeContext(organizationId: $orgId, campusId: $campusA);
 
     $result = $viewer->studentIds($actor, $student, $scopeForCampusA);
@@ -398,7 +398,7 @@ it('ensures denial exception message contains no plain value or record id', func
     $guardian->setNationalId($fakeCnic);
     $guardian->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     try {
         $viewer->guardianNationalId($actor, $guardian);
@@ -435,7 +435,7 @@ it('aborts value reveal if audit log insertion fails within transaction', functi
         throw new RuntimeException('Simulated database audit write failure.');
     });
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     expect(fn () => $viewer->studentIds($actor, $student))
         ->toThrow(RuntimeException::class, 'Simulated database audit write failure.');
@@ -461,7 +461,7 @@ it('denies campus-scoped permission holder when scope context is null', function
     $student->setBForm('00000-0000011-1');
     $student->save();
 
-    $viewer = new PiiViewer;
+    $viewer = app(PiiViewer::class);
 
     expect(fn () => $viewer->studentIds($actor, $student, null))
         ->toThrow(PiiAccessDenied::class);

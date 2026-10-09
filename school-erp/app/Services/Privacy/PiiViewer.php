@@ -151,14 +151,4 @@ final class PiiViewer
             return $resolver();
         });
     }
-
-    /**
-     * Handle static calls gracefully.
-     *
-     * @param  array<int, mixed>  $arguments
-     */
-    public static function __callStatic(string $method, array $arguments): mixed
-    {
-        return (new self)->$method(...$arguments);
-    }
 }
