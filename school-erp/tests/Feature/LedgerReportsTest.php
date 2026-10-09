@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Role;
-use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Services\Access\ScopeContext;
 use App\Services\Ledger\DefaultChartOfAccounts;
@@ -18,27 +16,11 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\DbFactory as F;
+use Tests\Support\RoleAssignments;
 
 beforeEach(function () {
     $this->seed([PermissionSeeder::class, RoleSeeder::class]);
 });
-
-function assignReportsRole(User $user, string $roleKey, string $scopeType = 'org', ?string $scopeId = null): void
-{
-    /** @var Role $role */
-    $role = Role::query()->where('key', $roleKey)->where('is_system', true)->firstOrFail();
-
-    RoleAssignment::query()->create([
-        'organization_id' => $user->organization_id,
-        'user_id' => $user->id,
-        'role_id' => $role->id,
-        'scope_type' => $scopeType,
-        'scope_id' => $scopeId,
-        'status' => 'active',
-        'starts_at' => now()->subMinute(),
-        'ends_at' => null,
-    ]);
-}
 
 /**
  * @return array{org: string, campus: string, actor: User, family: string, poster: LedgerPoster, reports: LedgerReports, scope: ScopeContext}
@@ -49,7 +31,7 @@ function reportsFixture(): array
     $campus = F::campus($org);
     $userId = F::user($org);
     $actor = User::query()->findOrFail($userId);
-    assignReportsRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $family = F::family($org);
     DefaultChartOfAccounts::seedFor($org);
     $poster = new LedgerPoster;
@@ -291,13 +273,13 @@ it('denies access with exact message "Not allowed." in all denial scenarios', fu
     // Scenario 2: Actor belonging to another organization
     $otherOrg = F::org();
     $foreignUser = User::query()->findOrFail(F::user($otherOrg));
-    assignReportsRole($foreignUser, 'org_admin');
+    RoleAssignments::assign($foreignUser, 'org_admin');
     expect(fn () => $f['reports']->trialBalance($foreignUser, $f['org'], $from, $to, $f['scope']))
         ->toThrow(LedgerAccessDenied::class, 'Not allowed.');
 
     // Scenario 3: Campus-scoped caller asking for the whole organization (campusId null)
     $campusUser = User::query()->findOrFail(F::user($f['org']));
-    assignReportsRole($campusUser, 'campus_admin', 'campus', $f['campus']);
+    RoleAssignments::assign($campusUser, 'campus_admin', 'campus', $f['campus']);
     $campusScope = new ScopeContext(organizationId: $f['org'], campusId: $f['campus']);
 
     expect(fn () => $f['reports']->trialBalance($campusUser, $f['org'], $from, $to, $campusScope, null))

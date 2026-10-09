@@ -46,6 +46,10 @@ final class LedgerPoster
                 throw new LedgerValidationException('not_enough_lines');
             }
 
+            if (count($request->lines) > 200) {
+                throw new LedgerValidationException('too_many_lines');
+            }
+
             $totalDebit = 0;
             $totalCredit = 0;
 

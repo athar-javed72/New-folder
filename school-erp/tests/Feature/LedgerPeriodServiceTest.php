@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use App\Models\AuditLog;
 use App\Models\LedgerPeriod;
-use App\Models\Role;
-use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Services\Access\ScopeContext;
 use App\Services\Ledger\LedgerAccessDenied;
@@ -16,28 +14,11 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\DbFactory as F;
+use Tests\Support\RoleAssignments;
 
 beforeEach(function () {
     $this->seed([PermissionSeeder::class, RoleSeeder::class]);
 });
-
-/** Same pattern as the Access tests: a real role assignment, resolved by AccessResolver. */
-function assignLedgerTestRole(User $user, string $roleKey, string $scopeType = 'org', ?string $scopeId = null): void
-{
-    /** @var Role $role */
-    $role = Role::query()->where('key', $roleKey)->where('is_system', true)->firstOrFail();
-
-    RoleAssignment::query()->create([
-        'organization_id' => $user->organization_id,
-        'user_id' => $user->id,
-        'role_id' => $role->id,
-        'scope_type' => $scopeType,
-        'scope_id' => $scopeId,
-        'status' => 'active',
-        'starts_at' => now()->subMinute(),
-        'ends_at' => null,
-    ]);
-}
 
 function ledgerTestUser(string $org): User
 {
@@ -114,7 +95,7 @@ it('gives two organizations separate periods for the same date', function () {
 it('lets an actor holding ledger.period.close close the period', function () {
     $org = F::org();
     $actor = ledgerTestUser($org);
-    assignLedgerTestRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($org, Carbon::create(2026, 8, 14));
 
@@ -131,7 +112,7 @@ it('denies an actor without ledger.period.close, writes no audit row and leaves 
     $org = F::org();
     $campus = F::campus($org);
     $actor = ledgerTestUser($org);
-    assignLedgerTestRole($actor, 'campus_admin', 'campus', $campus); // campus admin does not hold ledger.period.close
+    RoleAssignments::assign($actor, 'campus_admin', 'campus', $campus); // campus admin does not hold ledger.period.close
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($org, Carbon::create(2026, 8, 14));
 
@@ -146,7 +127,7 @@ it('denies an actor of another organization, writes no audit row and leaves the 
     $orgA = F::org();
     $orgB = F::org();
     $outsider = ledgerTestUser($orgB);
-    assignLedgerTestRole($outsider, 'org_admin');
+    RoleAssignments::assign($outsider, 'org_admin');
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($orgA, Carbon::create(2026, 8, 14));
 
@@ -160,7 +141,7 @@ it('denies an actor of another organization, writes no audit row and leaves the 
 it('leaves exactly one audit row when a period is closed twice', function () {
     $org = F::org();
     $actor = ledgerTestUser($org);
-    assignLedgerTestRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($org, Carbon::create(2026, 8, 14));
     $scope = new ScopeContext(organizationId: $org);
@@ -178,7 +159,7 @@ it('leaves exactly one audit row when a period is closed twice', function () {
 it('writes an audit row with action ledger.period.closed, subject ledger_period and only the period name in meta', function () {
     $org = F::org();
     $actor = ledgerTestUser($org);
-    assignLedgerTestRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($org, Carbon::create(2026, 8, 14));
 
@@ -196,7 +177,7 @@ it('writes an audit row with action ledger.period.closed, subject ledger_period 
 it('rejects a raw update that reopens a closed period', function () {
     $org = F::org();
     $actor = ledgerTestUser($org);
-    assignLedgerTestRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $svc = new LedgerPeriodService;
     $period = $svc->forDate($org, Carbon::create(2026, 8, 14));
     $svc->close($actor, $period, new ScopeContext(organizationId: $org));
@@ -206,4 +187,19 @@ it('rejects a raw update that reopens a closed period', function () {
     }))->toThrow(QueryException::class);
 
     expect(LedgerPeriod::query()->findOrFail($period->id)->status)->toBe('closed');
+});
+
+it('throws when a custom overlapping period blocks calendar-month creation for a date outside the custom range', function () {
+    $org = F::org();
+    F::period($org, [
+        'name' => 'custom',
+        'starts_on' => '2026-08-10',
+        'ends_on' => '2026-08-20',
+        'status' => 'open',
+    ]);
+
+    expect(fn () => (new LedgerPeriodService)->forDate($org, Carbon::create(2026, 8, 5)))
+        ->toThrow(RuntimeException::class, 'No ledger period for date.');
+
+    expect(DB::table('ledger_periods')->where('organization_id', $org)->count())->toBe(1);
 });

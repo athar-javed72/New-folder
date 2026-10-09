@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Account;
-use App\Models\Role;
-use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Services\Access\ScopeContext;
 use App\Services\Ledger\DefaultChartOfAccounts;
@@ -20,30 +18,11 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DbFactory as F;
+use Tests\Support\RoleAssignments;
 
 beforeEach(function () {
     $this->seed([PermissionSeeder::class, RoleSeeder::class]);
 });
-
-/**
- * Assigns system role to user via active role assignment.
- */
-function assignGoldenRole(User $user, string $roleKey, string $scopeType = 'org', ?string $scopeId = null): void
-{
-    /** @var Role $role */
-    $role = Role::query()->where('key', $roleKey)->where('is_system', true)->firstOrFail();
-
-    RoleAssignment::query()->create([
-        'organization_id' => $user->organization_id,
-        'user_id' => $user->id,
-        'role_id' => $role->id,
-        'scope_type' => $scopeType,
-        'scope_id' => $scopeId,
-        'status' => 'active',
-        'starts_at' => now()->subMinute(),
-        'ends_at' => null,
-    ]);
-}
 
 /**
  * @return array{org: string, campus: string, actor: User, family: string, poster: LedgerPoster, scope: ScopeContext}
@@ -54,7 +33,7 @@ function goldenFixture(): array
     $campus = F::campus($org);
     $userId = F::user($org);
     $actor = User::query()->findOrFail($userId);
-    assignGoldenRole($actor, 'org_admin');
+    RoleAssignments::assign($actor, 'org_admin');
     $family = F::family($org);
     DefaultChartOfAccounts::seedFor($org);
     $poster = new LedgerPoster;

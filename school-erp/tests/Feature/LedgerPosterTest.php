@@ -2,18 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\LedgerPeriod;
 use App\Services\Ledger\DefaultChartOfAccounts;
 use App\Services\Ledger\LedgerConflict;
 use App\Services\Ledger\LedgerPeriodClosed;
+use App\Services\Ledger\LedgerPeriodService;
 use App\Services\Ledger\LedgerPoster;
 use App\Services\Ledger\LedgerValidationException;
 use App\Services\Ledger\PostingLine;
 use App\Services\Ledger\PostingRequest;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\DbFactory as F;
 
 /**
@@ -451,6 +455,228 @@ it('allows subsequent valid post after a failed post inside same test transactio
 
     expect($valid)->toBeInstanceOf(JournalEntry::class)
         ->and($valid->total_minor)->toBe(10_000);
+});
+
+it('restores deferred balance constraints after a failed IMMEDIATE savepoint so later posts and deferred inserts work', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+    $period = (new LedgerPeriodService)->forDate($t['org'], Carbon::create(2026, 8, 15));
+    $cashAccount = Account::query()->where('organization_id', $t['org'])->systemKey('cash')->firstOrFail();
+
+    expect(function () use ($t, $period, $cashAccount) {
+        DB::transaction(function () use ($t, $period, $cashAccount) {
+            $rawId = (string) Str::ulid();
+            DB::table('journal_entries')->insert([
+                'id' => $rawId,
+                'organization_id' => $t['org'],
+                'campus_id' => $t['campus'],
+                'period_id' => $period->id,
+                'entry_date' => '2026-08-15',
+                'source_type' => 'voucher',
+                'source_id' => (string) Str::ulid(),
+                'kind' => 'posting',
+                'line_count' => 2,
+                'total_minor' => 1_000_000,
+                'lines_hash' => str_repeat('b', 64),
+                'created_by' => $t['user'],
+                'created_at' => now(),
+            ]);
+
+            DB::table('journal_lines')->insert([
+                [
+                    'id' => (string) Str::ulid(),
+                    'organization_id' => $t['org'],
+                    'entry_id' => $rawId,
+                    'line_no' => 1,
+                    'account_id' => $cashAccount->id,
+                    'debit_minor' => 1_000_000,
+                    'credit_minor' => 0,
+                    'created_at' => now(),
+                ],
+                [
+                    'id' => (string) Str::ulid(),
+                    'organization_id' => $t['org'],
+                    'entry_id' => $rawId,
+                    'line_no' => 2,
+                    'account_id' => $cashAccount->id,
+                    'debit_minor' => 0,
+                    'credit_minor' => 900_000,
+                    'created_at' => now(),
+                ],
+            ]);
+
+            DB::statement('SET CONSTRAINTS journal_entries_balanced, journal_lines_balanced IMMEDIATE');
+        });
+    })->toThrow(QueryException::class);
+
+    $valid = $poster->post(new PostingRequest(
+        $t['org'],
+        $t['campus'],
+        Carbon::create(2026, 8, 15),
+        'payment',
+        F::id(),
+        $t['user'],
+        null,
+        [
+            PostingLine::debit('cash', 10_000),
+            PostingLine::credit('tuition_income', 10_000),
+        ],
+    ));
+
+    expect($valid)->toBeInstanceOf(JournalEntry::class)
+        ->and(DB::select('SELECT 1'))->not->toBeEmpty();
+
+    try {
+        DB::transaction(function () use ($t, $period, $cashAccount) {
+            $rawId = (string) Str::ulid();
+            DB::table('journal_entries')->insert([
+                'id' => $rawId,
+                'organization_id' => $t['org'],
+                'campus_id' => $t['campus'],
+                'period_id' => $period->id,
+                'entry_date' => '2026-08-16',
+                'source_type' => 'voucher',
+                'source_id' => (string) Str::ulid(),
+                'kind' => 'posting',
+                'line_count' => 2,
+                'total_minor' => 1_000_000,
+                'lines_hash' => str_repeat('c', 64),
+                'created_by' => $t['user'],
+                'created_at' => now(),
+            ]);
+
+            DB::table('journal_lines')->insert([
+                [
+                    'id' => (string) Str::ulid(),
+                    'organization_id' => $t['org'],
+                    'entry_id' => $rawId,
+                    'line_no' => 1,
+                    'account_id' => $cashAccount->id,
+                    'debit_minor' => 1_000_000,
+                    'credit_minor' => 0,
+                    'created_at' => now(),
+                ],
+                [
+                    'id' => (string) Str::ulid(),
+                    'organization_id' => $t['org'],
+                    'entry_id' => $rawId,
+                    'line_no' => 2,
+                    'account_id' => $cashAccount->id,
+                    'debit_minor' => 0,
+                    'credit_minor' => 900_000,
+                    'created_at' => now(),
+                ],
+            ]);
+
+            // Insert itself must not throw while constraints remain DEFERRED.
+            throw new RuntimeException('rollback deferred unbalanced insert');
+        });
+    } catch (RuntimeException $e) {
+        expect($e->getMessage())->toBe('rollback deferred unbalanced insert');
+    }
+});
+
+it('rejects more than 200 lines as too_many_lines and writes nothing', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+
+    $lines = [];
+    for ($i = 0; $i < 201; $i++) {
+        $lines[] = $i % 2 === 0
+            ? PostingLine::debit('cash', 1)
+            : PostingLine::credit('tuition_income', 1);
+    }
+    // 101 debit + 100 credit of 1; bump one credit so the set is balanced before the count check.
+    $lines[199] = PostingLine::credit('tuition_income', 2);
+
+    $entriesBefore = JournalEntry::query()->count();
+    $linesBefore = JournalLine::query()->count();
+
+    try {
+        $poster->post(new PostingRequest(
+            $t['org'],
+            $t['campus'],
+            Carbon::create(2026, 8, 1),
+            'payment',
+            F::id(),
+            $t['user'],
+            null,
+            $lines,
+        ));
+        test()->fail('Expected LedgerValidationException with reason too_many_lines but none was thrown.');
+    } catch (LedgerValidationException $e) {
+        expect($e->reason)->toBe('too_many_lines');
+    }
+
+    expect(JournalEntry::query()->count())->toBe($entriesBefore)
+        ->and(JournalLine::query()->count())->toBe($linesBefore);
+});
+
+it('posts exactly 200 balanced lines fine', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+
+    $lines = [];
+    for ($i = 0; $i < 200; $i++) {
+        $lines[] = $i % 2 === 0
+            ? PostingLine::debit('cash', 1)
+            : PostingLine::credit('tuition_income', 1);
+    }
+
+    $entry = $poster->post(new PostingRequest(
+        $t['org'],
+        $t['campus'],
+        Carbon::create(2026, 8, 1),
+        'payment',
+        F::id(),
+        $t['user'],
+        null,
+        $lines,
+    ));
+
+    expect($entry->line_count)->toBe(200)
+        ->and($entry->total_minor)->toBe(100)
+        ->and(JournalLine::query()->where('entry_id', $entry->id)->count())->toBe(200);
+});
+
+it('throws LedgerConflict when the same source is posted again on a different campus of the same organization', function () {
+    $t = posterTenant();
+    $poster = new LedgerPoster;
+    $campusB = F::campus($t['org']);
+    $sourceId = F::id();
+    $date = Carbon::create(2026, 8, 15);
+    $lines = [
+        PostingLine::debit('cash', 10_000),
+        PostingLine::credit('tuition_income', 10_000),
+    ];
+
+    $poster->post(new PostingRequest(
+        $t['org'],
+        $t['campus'],
+        $date,
+        'payment',
+        $sourceId,
+        $t['user'],
+        null,
+        $lines,
+    ));
+
+    $entriesBefore = JournalEntry::query()->count();
+    $linesBefore = JournalLine::query()->count();
+
+    expect(fn () => $poster->post(new PostingRequest(
+        $t['org'],
+        $campusB,
+        $date,
+        'payment',
+        $sourceId,
+        $t['user'],
+        null,
+        $lines,
+    )))->toThrow(LedgerConflict::class);
+
+    expect(JournalEntry::query()->count())->toBe($entriesBefore)
+        ->and(JournalLine::query()->count())->toBe($linesBefore);
 });
 
 it('posts P4 shape fine', function () {

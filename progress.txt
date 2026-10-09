@@ -47,3 +47,4 @@ Completed Tasks:
 - Fix: removed __callStatic from PiiViewer (Pest: 301 passed, 1714 assertions).
 - Fix: .env.example uses pgsql placeholders
 - Review fixes R1: seedFor never overwrites, next() needs a transaction, created_by tenancy, LedgerTenancy helper. Gate: php -l (changed files), pint --test, pest (306 passed, 1 skipped, 1726 assertions), phpstan analyse (72/72 files, 0 errors). Decision change: seedFor no longer refreshes name/code on re-run (D-48 schools may renumber/rename). No new test for next() transaction guard under RefreshDatabase (tests already run inside that transaction). Changes left uncommitted per instructions. STOP.
+- Review fixes R2: line cap, real constraint-mode test, extra tests, shared RoleAssignments helper. Gate: php -l (changed files), pint --test, pest (311 passed, 1 skipped, 1742 assertions), phpstan analyse (72/72 files, 0 errors). Changes left uncommitted per instructions. STOP.
